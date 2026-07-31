@@ -42,11 +42,12 @@
         </ul>
       </div>
 
-      <button class="mt-6 w-full bg-saffron-500 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-6 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+      <a [routerLink]="['/payment', booking()!.bookingId]"
+         class="mt-6 block text-center w-full bg-saffron-500 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-6 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
         Proceed to payment
-      </button>
+      </a>
       <p class="text-white/40 text-xs mt-3 text-center">
-        Payment is handled by the Payment Service (see ROADMAP.md) — not part of this vertical slice.
+        Payment simulated for this demo — no real card is charged.
       </p>
     }
   </div>
