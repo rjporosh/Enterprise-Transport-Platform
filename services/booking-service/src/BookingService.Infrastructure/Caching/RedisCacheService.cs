@@ -28,22 +28,25 @@ public sealed class RedisCacheService : ICacheService
 
     private string Prefixed(string key) => $"{_options.InstanceName}{key}";
 
-    public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
+    public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
         try
         {
             var db = _redis.GetDatabase();
             var value = await db.StringGetAsync(Prefixed(key));
-            return value.IsNullOrEmpty ? null : JsonSerializer.Deserialize<T>(value!, JsonOptions);
+                if (value.IsNullOrEmpty)
+                         return default;
+                         
+            return JsonSerializer.Deserialize<T>(value.ToString()!, JsonOptions);            
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Redis GET failed for key {Key}; falling back to source of truth.", key);
-            return null;
+            return default;
         }
     }
 
-    public async Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken cancellationToken = default) where T : class
+    public async Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken cancellationToken = default)
     {
         try
         {

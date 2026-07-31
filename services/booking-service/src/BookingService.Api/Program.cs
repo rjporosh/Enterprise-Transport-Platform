@@ -8,7 +8,7 @@ using BookingService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+//using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -51,7 +51,7 @@ builder.Services.AddOpenTelemetry()
         tracing
             .AddAspNetCoreInstrumentation(options => options.RecordException = true)
             .AddHttpClientInstrumentation()
-            .AddNpgsql()
+            .AddNpgSql()
             // Parameterless overload resolves IConnectionMultiplexer from DI at
             // startup (OpenTelemetry.Instrumentation.StackExchangeRedis, DI-aware
             // registration). If your installed package version only exposes the
@@ -59,6 +59,8 @@ builder.Services.AddOpenTelemetry()
             // overload, resolve it here instead:
             //   var muxer = builder.Services.BuildServiceProvider().GetRequiredService<IConnectionMultiplexer>();
             //   tracing.AddRedisInstrumentation(muxer);
+            .AddRabbitMQ()
+            .AddRedis(builder.Configuration["Redis:ConnectionString"]!)
             .AddRedisInstrumentation();
 
         var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
@@ -95,56 +97,58 @@ builder.Services.AddAuthorization();
 
 // --- API documentation: Swagger (classic) + native OpenAPI/Scalar (modern) --
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Bus Ticketing — Booking Service",
-        Version = "v1",
-        Description = "Owns trip search, seat holds, booking lifecycle and the booking outbox. " +
-                       "Every endpoint below has a filled-in example — hit **Authorize**, paste a " +
-                       "bearer token, then **Try it out**.",
-        Contact = new OpenApiContact { Name = "Bus Ticketing Platform Team" }
-    });
+// builder.Services.AddSwaggerGen(options =>
+// {
+//     options.SwaggerDoc("v1", new OpenApiInfo
+//     {
+//         Title = "Bus Ticketing — Booking Service",
+//         Version = "v1",
+//         Description = "Owns trip search, seat holds, booking lifecycle and the booking outbox. " +
+//                        "Every endpoint below has a filled-in example — hit **Authorize**, paste a " +
+//                        "bearer token, then **Try it out**.",
+//         Contact = new OpenApiContact { Name = "Bus Ticketing Platform Team" }
+//     });
 
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Paste just the raw JWT (no 'Bearer ' prefix — Swashbuckle adds it)."
-    });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
-            Array.Empty<string>()
-        }
-    });
-});
+//     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+//     {
+//         Name = "Authorization",
+//         Type = SecuritySchemeType.Http,
+//         Scheme = "bearer",
+//         BearerFormat = "JWT",
+//         In = ParameterLocation.Header,
+//         Description = "Paste just the raw JWT (no 'Bearer ' prefix — Swashbuckle adds it)."
+//     });
+//     options.AddSecurityRequirement(new OpenApiSecurityRequirement
+//     {
+//         {
+//             new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+//             Array.Empty<string>()
+//         }
+//     });
+// });
 
 // Native Microsoft.AspNetCore.OpenApi document — this is what Scalar renders.
-builder.Services.AddOpenApi("v1", options =>
-{
-    options.AddDocumentTransformer((document, _, _) =>
-    {
-        document.Info.Title = "Bus Ticketing — Booking Service";
-        document.Info.Version = "v1";
-        document.Info.Description = "Trip search, seat holds, booking lifecycle. See /scalar for the interactive reference.";
+builder.Services.AddOpenApi("v1"
+// , options =>
+// {
+//     options.AddDocumentTransformer((document, _, _) =>
+//     {
+//         document.Info.Title = "Bus Ticketing — Booking Service";
+//         document.Info.Version = "v1";
+//         document.Info.Description = "Trip search, seat holds, booking lifecycle. See /scalar for the interactive reference.";
 
-        document.Components ??= new OpenApiComponents();
-        document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT",
-            Description = "Paste a raw JWT access token."
-        };
-        return Task.CompletedTask;
-    });
-});
+//         document.Components ??= new OpenApiComponents();
+//         document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+//         {
+//             Type = SecuritySchemeType.Http,
+//             Scheme = "bearer",
+//             BearerFormat = "JWT",
+//             Description = "Paste a raw JWT access token."
+//         };
+//         return Task.CompletedTask;
+//     });
+// }
+);
 
 builder.Services.AddCors(options =>
 {
@@ -157,9 +161,9 @@ builder.Services.AddCors(options =>
 
 // --- Health checks (surfaced at /health; each dependency also feeds Grafana via its own exporter) ---
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty, name: "postgres")
+    .AddNpgsql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty)
     .AddRabbitMQ(name: "rabbitmq")
-    .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379", name: "redis");
+    .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
 
 var app = builder.Build();
 
@@ -169,23 +173,25 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
 app.MapOpenApi(); // -> /openapi/v1.json, consumed by Scalar below
-app.MapScalarApiReference("/scalar", options =>
-{
-    options
-        .WithTitle("Bus Ticketing — Booking Service")
-        .WithTheme(ScalarTheme.Purple)
-        .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-        .WithPreferredScheme("Bearer");
-});
-
+app.MapScalarApiReference("/scalar"
+// , options =>
+// {
+//     options
+//         .WithTitle("Bus Ticketing — Booking Service")
+//         .WithTheme(ScalarTheme.Purple)
+//         .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+//         .WithPreferredScheme("Bearer");
+// }
+);
+app.MapScalarApiReference("/scalar");
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking Service v1");
-        options.DocumentTitle = "Bus Ticketing — Booking Service";
-    });
+    // app.UseSwagger();
+    // app.UseSwaggerUI(options =>
+    // {
+    //     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking Service v1");
+    //     options.DocumentTitle = "Bus Ticketing — Booking Service";
+    // });
 }
 
 app.UseCors("AllowConfiguredOrigins");
