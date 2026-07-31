@@ -16,7 +16,7 @@ stubs. See "What's built" below for exactly what that covers.
 | Layer | Location | Status |
 |---|---|---|
 | Booking Service (backend) | `services/booking-service` | Implemented: search trips, create/cancel booking, seat-hold concurrency, transactional outbox → RabbitMQ, unit + integration tests |
-| Customer web app | `apps/angular-client/bus-ticketing-customer-web` | Implemented: search → seat selection → booking confirmation flow (Angular 19, standalone components, signals) |
+| Customer web app | `apps/angular-client/bus-ticketing-customer-web` | Implemented: search → seat selection → booking confirmation flow (Angular 22, standalone components, signals) |
 | Admin console | `apps/react-admin/bus-ticketing-admin` | Implemented: bookings list + detail, cancel-booking action (React 19, TanStack Query) |
 | Local orchestration | `infrastructure/docker/docker-compose.yml` | Implemented: Postgres, RabbitMQ, and all three apps wired together |
 

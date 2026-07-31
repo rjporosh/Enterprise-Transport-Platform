@@ -54,7 +54,7 @@ depth-first on one real path instead.
 
 ## Running locally
 
-Requires the .NET 9 SDK, Docker (for Postgres/RabbitMQ), and was **not**
+Requires the .NET 10 SDK, Docker (for Postgres/RabbitMQ), and was **not**
 compiled in the environment that generated it — no dotnet SDK or package
 registry access was available there. Review before relying on it; the
 Testcontainers-based integration tests in particular are written to run
