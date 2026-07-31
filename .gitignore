@@ -1,17 +1,18 @@
 # .NET
-bin/
-obj/
-*.user
+**/bin/
+**/obj/
 
 # Node
-node_modules/
-dist/
-out-tsc/
-.angular/
+**/node_modules/
+**/dist/
+**/build/
+**/.angular/
 
-# Env / secrets
-.env
-*.local
+# IDE
+.vs/
+.vscode/
+.idea/
 
-# OS
-.DS_Store
+# Tests
+coverage/
+TestResults/
