@@ -15,4 +15,6 @@
 
 # Tests
 coverage/
-TestResults/
+TestResults/-e 
+# macOS
+**/.DS_Store
