@@ -40,7 +40,7 @@ public class SearchTripsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ReturnsMatchingTrip_WithCorrectAvailableSeatCount()
     {
-        var handler = new SearchTripsHandler(_context);
+        var handler = new SearchTripsHandler(_context, new FakeCacheService());
         var query = new SearchTripsQuery("Dhaka", "Chattogram", DepartureDate);
 
         var result = await handler.Handle(query, CancellationToken.None);
@@ -56,7 +56,7 @@ public class SearchTripsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WhenNoRouteMatches_ReturnsEmptyResult()
     {
-        var handler = new SearchTripsHandler(_context);
+        var handler = new SearchTripsHandler(_context, new FakeCacheService());
         var query = new SearchTripsQuery("Dhaka", "Sylhet", DepartureDate);
 
         var result = await handler.Handle(query, CancellationToken.None);

@@ -2,10 +2,12 @@ using BookingService.Application.Features.Bookings.CreateBooking;
 using BookingService.Domain.Common;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Exceptions;
+using BookingService.Application.Common.Interfaces;
 using BookingService.UnitTests.TestSupport;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Xunit;
 
 namespace BookingService.UnitTests.Bookings;
@@ -15,6 +17,8 @@ public class CreateBookingHandlerTests : IDisposable
     private readonly TestBookingDbContext _context;
     private readonly FakeEventPublisher _eventPublisher = new();
     private readonly FakeDateTimeProvider _clock = new();
+    private readonly FakeCacheService _cache = new();
+    private readonly IBookingMetrics _metrics = Substitute.For<IBookingMetrics>();
     private readonly Guid _tripId = Guid.NewGuid();
 
     public CreateBookingHandlerTests()
@@ -38,7 +42,7 @@ public class CreateBookingHandlerTests : IDisposable
     }
 
     private CreateBookingHandler CreateHandler() =>
-        new(_context, _eventPublisher, _clock, NullLogger<CreateBookingHandler>.Instance);
+        new(_context, _eventPublisher, _clock, _cache, _metrics, NullLogger<CreateBookingHandler>.Instance);
 
     [Fact]
     public async Task Handle_WithAvailableSeats_CreatesBooking_HoldsSeats_AndEnqueuesOutboxEvent()

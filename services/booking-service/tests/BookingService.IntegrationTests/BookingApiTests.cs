@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
+using Testcontainers.Redis;
 using Xunit;
 
 namespace BookingService.IntegrationTests;
@@ -31,18 +32,23 @@ public sealed class BookingApiTests : IAsyncLifetime
         .WithImage("rabbitmq:3.13-management-alpine")
         .Build();
 
+    private readonly RedisContainer _redis = new RedisBuilder()
+        .WithImage("redis:7.4-alpine")
+        .Build();
+
     private WebApplicationFactory<Program>? _factory;
     private HttpClient _client = default!;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync(), _redis.StartAsync());
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:BookingDb", _postgres.GetConnectionString());
             builder.UseSetting("RabbitMq:HostName", _rabbitMq.Hostname);
             builder.UseSetting("RabbitMq:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
+            builder.UseSetting("Redis:ConnectionString", _redis.GetConnectionString());
         });
 
         _client = _factory.CreateClient();
@@ -76,6 +82,6 @@ public sealed class BookingApiTests : IAsyncLifetime
     {
         _client.Dispose();
         if (_factory is not null) await _factory.DisposeAsync();
-        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask());
+        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
     }
 }

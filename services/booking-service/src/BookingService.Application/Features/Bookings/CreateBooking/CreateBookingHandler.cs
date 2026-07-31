@@ -29,17 +29,23 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
     private readonly IBookingDbContext _context;
     private readonly IEventPublisher _eventPublisher;
     private readonly IDateTimeProvider _clock;
+    private readonly ICacheService _cache;
+    private readonly IBookingMetrics _metrics;
     private readonly ILogger<CreateBookingHandler> _logger;
 
     public CreateBookingHandler(
         IBookingDbContext context,
         IEventPublisher eventPublisher,
         IDateTimeProvider clock,
+        ICacheService cache,
+        IBookingMetrics metrics,
         ILogger<CreateBookingHandler> logger)
     {
         _context = context;
         _eventPublisher = eventPublisher;
         _clock = clock;
+        _cache = cache;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -56,7 +62,15 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
 
         // Throws SeatUnavailableException synchronously if any seat is already
         // Held/Booked based on what we just read.
-        trip.HoldSeats(seatNumbers);
+        try
+        {
+            trip.HoldSeats(seatNumbers);
+        }
+        catch (SeatUnavailableException)
+        {
+            _metrics.RecordSeatConflict();
+            throw;
+        }
 
         var now = _clock.UtcNow;
         var booking = Booking.Create(
@@ -81,6 +95,7 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
             _logger.LogWarning(ex,
                 "Concurrent seat hold conflict on trip {TripId} for seats {SeatNumbers}",
                 trip.Id, string.Join(",", seatNumbers));
+            _metrics.RecordSeatConflict();
 
             // Someone else committed a conflicting hold between our read and our
             // write. Surface it as the same business error a same-transaction
@@ -89,6 +104,11 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
         }
 
         booking.ClearDomainEvents();
+
+        // Available-seat counts just changed for this trip; drop cached search
+        // results rather than serving a stale count for the next 30s.
+        await _cache.RemoveByPrefixAsync("trips:search:", cancellationToken);
+        _metrics.RecordBookingCreated(booking.TotalAmount.Amount, booking.TotalAmount.Currency);
 
         return new BookingDto(
             booking.Id,

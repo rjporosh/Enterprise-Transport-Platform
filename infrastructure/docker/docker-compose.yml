@@ -1,4 +1,5 @@
-# Local dev/demo stack for the Booking Service vertical slice.
+# Local dev/demo stack for the Booking Service vertical slice, including a
+# full observability stack (Redis, Seq, Prometheus, Grafana, Jaeger).
 # Other services in MASTER_SPEC.md (Auth, Payment, Notification, ...) are not
 # built yet — see ROADMAP.md — so they aren't wired in here either.
 #
@@ -33,12 +34,77 @@ services:
     restart: unless-stopped
     ports:
       - "5672:5672"   # AMQP
-      - "15672:15672" # management UI
+      - "15672:15672" # management UI (guest/guest)
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: bus-ticketing-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --- Observability stack -------------------------------------------------
+
+  seq:
+    image: datalust/seq:2024.3
+    container_name: bus-ticketing-seq
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5341:5341"  # ingestion (Serilog writes here)
+      - "8081:80"    # web UI -> http://localhost:8081
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: bus-ticketing-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # web UI -> http://localhost:16686
+      - "4317:4317"   # OTLP gRPC (booking-service exports traces here)
+      - "4318:4318"   # OTLP HTTP
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: bus-ticketing-prometheus
+    restart: unless-stopped
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"   # web UI -> http://localhost:9090
+    depends_on:
+      - booking-service
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: bus-ticketing-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "3000:3000"   # web UI -> http://localhost:3000 (admin/admin)
+    depends_on:
+      - prometheus
+
+  # --- Application services --------------------------------------------------
 
   booking-service:
     build:
@@ -51,11 +117,16 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__BookingDb: "Host=postgres;Port=5432;Database=booking_service;Username=booking_svc;Password=changeme"
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: "5672"
+      Redis__ConnectionString: "redis:6379"
+      Seq__ServerUrl: "http://seq:5341"
+      OpenTelemetry__OtlpEndpoint: "http://jaeger:4317"
       Jwt__Issuer: "https://identity.bus-ticketing.local"
       Jwt__Audience: "bus-ticketing-api"
       Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
@@ -63,6 +134,10 @@ services:
       Cors__AllowedOrigins__1: "http://localhost:5173"
     ports:
       - "8080:8080"
+    # Swagger:    http://localhost:8080/swagger
+    # Scalar:     http://localhost:8080/scalar
+    # OpenAPI doc: http://localhost:8080/openapi/v1.json
+    # Metrics:    http://localhost:8080/metrics (scraped by Prometheus above)
 
   customer-web:
     build:

@@ -1,0 +1,68 @@
+{
+  "title": "Booking Service — Overview",
+  "uid": "booking-service-overview",
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Bookings created / min",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(bookings_created_total[1m])) * 60",
+          "legendFormat": "bookings/min"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Seat conflicts (409s) / min — proves the concurrency control under load",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(booking_seat_conflicts_total[1m])) * 60",
+          "legendFormat": "conflicts/min"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP request duration (p95, by route)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, http_route))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Bookings cancelled / min",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(bookings_cancelled_total[1m])) * 60",
+          "legendFormat": "cancellations/min"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Process CPU / working set",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "process_runtime_dotnet_gc_heap_size_bytes", "legendFormat": "GC heap size" }
+      ]
+    }
+  ]
+}

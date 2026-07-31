@@ -1,0 +1,299 @@
+{
+  "info": {
+    "_postman_id": "bb84153b-cefd-4885-b2fb-918340ddcb4c",
+    "name": "Bus Ticketing \u2014 Booking Service",
+    "description": "Real, runnable requests against the Booking Service vertical slice. The collection-level pre-request script mints a dev JWT and attaches it as a Bearer token to every request automatically \u2014 see 'Pre-request Script' on the collection itself. Run seed-demo-data.sql first so tripId/seat examples below actually exist.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection Pre-request Script",
+          "// Mints a fresh dev JWT (HS256) matching the Booking Service's",
+          "// appsettings.json Jwt:Issuer / Jwt:Audience / Jwt:SigningKey and attaches",
+          "// it as a Bearer token to EVERY request in this collection automatically \u2014",
+          "// no separate \"run a login request first\" step needed for local dev/testing.",
+          "//",
+          "// IMPORTANT: this only works because the signing key here matches the",
+          "// dev-only key baked into docker-compose.yml / appsettings.json. Never reuse",
+          "// this trick against a real deployed environment's secret.",
+          "",
+          "const signingKey = pm.environment.get('jwtSigningKey') || 'dev-only-signing-key-change-me-32chars-minimum';",
+          "const issuer = pm.environment.get('jwtIssuer') || 'https://identity.bus-ticketing.local';",
+          "const audience = pm.environment.get('jwtAudience') || 'bus-ticketing-api';",
+          "const customerId = pm.environment.get('customerId') || '00000000-0000-0000-0000-000000000001';",
+          "",
+          "function base64url(wordArray) {",
+          "    return CryptoJS.enc.Base64.stringify(wordArray)",
+          "        .replace(/=+$/, '')",
+          "        .replace(/\\+/g, '-')",
+          "        .replace(/\\//g, '_');",
+          "}",
+          "",
+          "const header = { alg: 'HS256', typ: 'JWT' };",
+          "const now = Math.floor(Date.now() / 1000);",
+          "const payload = {",
+          "    sub: customerId,",
+          "    iss: issuer,",
+          "    aud: audience,",
+          "    iat: now,",
+          "    exp: now + 3600,",
+          "    role: 'Customer'",
+          "};",
+          "",
+          "const encodedHeader = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "const encodedPayload = base64url(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "const toSign = encodedHeader + '.' + encodedPayload;",
+          "const signature = base64url(CryptoJS.HmacSHA256(toSign, signingKey));",
+          "const token = toSign + '.' + signature;",
+          "",
+          "pm.environment.set('access_token', token);",
+          "pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });",
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness / readiness check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Aggregates Postgres, RabbitMQ, and Redis health checks."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trips",
+      "item": [
+        {
+          "name": "Search trips (Dhaka -> Chattogram)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has items array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.items).to.be.an('array');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.items && body.items.length > 0) {",
+                  "    pm.environment.set('tripId', body.items[0].tripId);",
+                  "    console.log('Captured tripId ->', body.items[0].tripId);",
+                  "}",
+                  ""
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trips/search?origin=Dhaka&destination=Chattogram&date=2026-08-15&page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trips",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "origin",
+                  "value": "Dhaka"
+                },
+                {
+                  "key": "destination",
+                  "value": "Chattogram"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-08-15"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Public endpoint \u2014 no auth required, though the collection will still attach a bearer token (harmless, ignored by this endpoint)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create booking (hold seats)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Booking is PendingPayment', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.status).to.eql('PendingPayment');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (body.bookingId) {",
+                  "    pm.environment.set('bookingId', body.bookingId);",
+                  "    console.log('Captured bookingId ->', body.bookingId);",
+                  "}",
+                  ""
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tripId\": \"{{tripId}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"passengers\": [\n    {\n      \"seatNumber\": \"A1\",\n      \"fullName\": \"Porosh Ahmed\",\n      \"age\": 30,\n      \"gender\": \"Male\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings"
+              ]
+            },
+            "description": "Bearer token is attached automatically by the collection pre-request script. Run 'Search trips' first (or seed-demo-data.sql) so {{tripId}} is populated."
+          },
+          "response": []
+        },
+        {
+          "name": "Get booking by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Run 'Create booking' first so {{bookingId}} is populated."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"reason\": \"Change of travel plans\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "Run 'Create booking' first so {{bookingId}} is populated."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

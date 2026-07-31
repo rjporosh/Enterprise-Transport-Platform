@@ -1,8 +1,15 @@
+# Local scrape config. In the target multi-service architecture each service
+# gets its own job here (or, more likely, Prometheus scrapes an OTel
+# Collector instead of each service directly) — for this vertical slice
+# there's exactly one target.
 global:
-  scrape_interval: 15s
+  scrape_interval: 10s
+  evaluation_interval: 10s
 
 scrape_configs:
-  - job_name: "booking-service"
+  - job_name: booking-service
+    metrics_path: /metrics
     static_configs:
-      - targets:
-          - host.docker.internal:5000
+      - targets: ["booking-service:8080"]
+        labels:
+          service: booking-service
