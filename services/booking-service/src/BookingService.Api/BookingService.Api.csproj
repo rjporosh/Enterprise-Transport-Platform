@@ -9,8 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" /> -->
-    <!-- <PackageReference Include="Microsoft.OpenApi" Version="1.6.22" /> -->
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Seq" Version="8.0.0" />
@@ -22,7 +20,7 @@
 
     <!-- Native minimal-API OpenAPI document generation (Microsoft.AspNetCore.OpenApi), served at /openapi/v1.json. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-    <!-- Scalar renders that document as a modern, "click to try" API reference at /scalar/v1. -->
+    <!-- Scalar renders that document as a modern, "click to try" API reference at /scalar. -->
     <PackageReference Include="Scalar.AspNetCore" Version="2.1.2" />
 
     <!-- Observability: traces + metrics via OpenTelemetry, exported over OTLP to the Aspire Dashboard / Jaeger / Prometheus. -->

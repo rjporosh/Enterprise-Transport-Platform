@@ -1,11 +1,14 @@
+using System.Text.Json;
 using BookingService.Application.Features.Trips.SearchTrips;
 using MediatR;
-//using Microsoft.OpenApi.Any;
 
 namespace BookingService.Api.Endpoints;
 
 public static class TripsEndpoints
 {
+    private const int DefaultPage = 1;
+    private const int DefaultPageSize = 10;
+
     public static IEndpointRouteBuilder MapTripsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/trips").WithTags("Trips");
@@ -14,65 +17,49 @@ public static class TripsEndpoints
                 string origin,
                 string destination,
                 DateOnly date,
-                int page,
-                int pageSize,
+                int? page,
+                int? pageSize,
+                HttpContext httpContext,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var query = new SearchTripsQuery(
-                    origin,
-                    destination,
-                    date,
-                    page == 0 ? 1 : page,
-                    pageSize == 0 ? 20 : pageSize);
+                // If the caller omits page/pageSize entirely, fall back to
+                // page 1 / 10 results per page rather than returning
+                // everything unpaginated.
+                var effectivePage = page is null or <= 0 ? DefaultPage : page.Value;
+                var effectivePageSize = pageSize is null or <= 0 ? DefaultPageSize : pageSize.Value;
 
+                var query = new SearchTripsQuery(origin, destination, date, effectivePage, effectivePageSize);
                 var result = await sender.Send(query, cancellationToken);
+
+                // Pagination metadata goes in a response header (X-Pagination),
+                // the same pattern used across the platform's other list
+                // endpoints — keeps the JSON body as just the data, and lets
+                // clients that don't care about paging ignore the header
+                // entirely. See docs/API_PAGINATION.md for the exact shape.
+                var paginationHeader = JsonSerializer.Serialize(new
+                {
+                    currentPage = result.Page,
+                    pageSize = result.PageSize,
+                    totalCount = result.TotalCount,
+                    totalPages = result.TotalPages,
+                    hasPrevious = result.Page > 1,
+                    hasNext = result.Page < result.TotalPages
+                });
+                httpContext.Response.Headers.Append("X-Pagination", paginationHeader);
+                httpContext.Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
+
                 return Results.Ok(result);
             })
             .WithName("SearchTrips")
             .WithSummary("Search scheduled trips between two cities on a given date.")
             .WithDescription(
-                "Public, unauthenticated — anyone can browse trips before signing in. Results are " +
-                "cached in Redis for 30s per (origin, destination, date, page, pageSize) combination.")
+                "Public, unauthenticated — anyone can browse trips before signing in. " +
+                "Results are cached in Redis for 30s per (origin, destination, date, page, pageSize) " +
+                "combination. Omit page/pageSize to get page 1 of 10 results; pagination metadata " +
+                "is also returned in the X-Pagination response header. " +
+                "Example: /api/v1/trips/search?origin=Dhaka&destination=Chattogram&date=2026-08-15")
             .Produces<object>(StatusCodes.Status200OK);
-            // .WithOpenApi(operation =>
-            // {
-            //     operation.Parameters[0].Example = new OpenApiString("Dhaka");       // origin
-            //     operation.Parameters[1].Example = new OpenApiString("Chattogram");  // destination
-            //     operation.Parameters[2].Example = new OpenApiString("2026-08-15");  // date
-            //     operation.Parameters[3].Example = new OpenApiInteger(1);            // page
-            //     operation.Parameters[4].Example = new OpenApiInteger(20);           // pageSize
-
-            //     if (operation.Responses.TryGetValue("200", out var ok))
-            //     {
-            //         ok.Content["application/json"].Example = new OpenApiObject
-            //         {
-            //             ["items"] = new OpenApiArray
-            //             {
-            //                 new OpenApiObject
-            //                 {
-            //                     ["tripId"] = new OpenApiString("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-            //                     ["originCity"] = new OpenApiString("Dhaka"),
-            //                     ["destinationCity"] = new OpenApiString("Chattogram"),
-            //                     ["departureUtc"] = new OpenApiString("2026-08-15T02:00:00Z"),
-            //                     ["arrivalUtc"] = new OpenApiString("2026-08-15T08:00:00Z"),
-            //                     ["busType"] = new OpenApiString("AC Sleeper"),
-            //                     ["operatorPlateNumber"] = new OpenApiString("DHK-1234"),
-            //                     ["pricePerSeat"] = new OpenApiDouble(1500.00),
-            //                     ["currency"] = new OpenApiString("BDT"),
-            //                     ["availableSeats"] = new OpenApiInteger(24),
-            //                     ["totalSeats"] = new OpenApiInteger(36)
-            //                 }
-            //             },
-            //             ["totalCount"] = new OpenApiInteger(1),
-            //             ["page"] = new OpenApiInteger(1),
-            //             ["pageSize"] = new OpenApiInteger(20),
-            //             ["totalPages"] = new OpenApiInteger(1)
-            //         };
-            //     }
-
-            //     return operation;
-            // });
 
         return app;
     }

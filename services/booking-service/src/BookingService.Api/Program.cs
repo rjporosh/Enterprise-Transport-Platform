@@ -8,13 +8,11 @@ using BookingService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-//using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using Serilog;
-using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 const string ServiceName = "booking-service";
@@ -39,9 +37,16 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // --- Observability: OpenTelemetry traces + metrics --------------------------
-// Traces export over OTLP to Jaeger (accepts OTLP natively since 1.35+, see
-// docker-compose). Metrics are scraped by Prometheus from /metrics and
-// visualized in Grafana (dashboards provisioned in infrastructure/monitoring).
+// Traces export over OTLP to Jaeger. Metrics are scraped by Prometheus from
+// /metrics and visualized in Grafana (see infrastructure/monitoring and
+// docs/OBSERVABILITY_GUIDE.md for exact queries to run against each tool).
+//
+// IMPORTANT: this block only touches TracerProviderBuilder/MeterProviderBuilder
+// extension methods (Add***Instrumentation / AddOtlpExporter / AddPrometheusExporter).
+// Health checks (AddNpgSql/AddRabbitMQ/AddRedis) belong ONLY in the
+// AddHealthChecks() block further down — mixing them in here previously
+// caused the "builds but won't start" bug reported after the .NET 10 upgrade,
+// since those are IHealthChecksBuilder extensions, not tracing/metrics ones.
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(
         serviceName: ServiceName,
@@ -51,17 +56,16 @@ builder.Services.AddOpenTelemetry()
         tracing
             .AddAspNetCoreInstrumentation(options => options.RecordException = true)
             .AddHttpClientInstrumentation()
-            .AddNpgSql()
-            // Parameterless overload resolves IConnectionMultiplexer from DI at
-            // startup (OpenTelemetry.Instrumentation.StackExchangeRedis, DI-aware
-            // registration). If your installed package version only exposes the
-            // instance-based AddRedisInstrumentation(IConnectionMultiplexer)
-            // overload, resolve it here instead:
-            //   var muxer = builder.Services.BuildServiceProvider().GetRequiredService<IConnectionMultiplexer>();
-            //   tracing.AddRedisInstrumentation(muxer);
-            .AddRabbitMQ()
-            .AddRedis(builder.Configuration["Redis:ConnectionString"]!)
-            .AddRedisInstrumentation();
+            .AddNpgsql();
+
+        // Parameterless overload resolves IConnectionMultiplexer from DI at
+        // startup (OpenTelemetry.Instrumentation.StackExchangeRedis). If your
+        // installed package version only exposes the instance-based
+        // AddRedisInstrumentation(IConnectionMultiplexer) overload, resolve it
+        // via a temporary provider instead:
+        //   using var sp = builder.Services.BuildServiceProvider();
+        //   tracing.AddRedisInstrumentation(sp.GetRequiredService<IConnectionMultiplexer>());
+        tracing.AddRedisInstrumentation();
 
         var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
         if (!string.IsNullOrWhiteSpace(otlpEndpoint))
@@ -95,60 +99,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-// --- API documentation: Swagger (classic) + native OpenAPI/Scalar (modern) --
-builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen(options =>
-// {
-//     options.SwaggerDoc("v1", new OpenApiInfo
-//     {
-//         Title = "Bus Ticketing — Booking Service",
-//         Version = "v1",
-//         Description = "Owns trip search, seat holds, booking lifecycle and the booking outbox. " +
-//                        "Every endpoint below has a filled-in example — hit **Authorize**, paste a " +
-//                        "bearer token, then **Try it out**.",
-//         Contact = new OpenApiContact { Name = "Bus Ticketing Platform Team" }
-//     });
-
-//     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-//     {
-//         Name = "Authorization",
-//         Type = SecuritySchemeType.Http,
-//         Scheme = "bearer",
-//         BearerFormat = "JWT",
-//         In = ParameterLocation.Header,
-//         Description = "Paste just the raw JWT (no 'Bearer ' prefix — Swashbuckle adds it)."
-//     });
-//     options.AddSecurityRequirement(new OpenApiSecurityRequirement
-//     {
-//         {
-//             new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
-//             Array.Empty<string>()
-//         }
-//     });
-// });
-
-// Native Microsoft.AspNetCore.OpenApi document — this is what Scalar renders.
-builder.Services.AddOpenApi("v1"
-// , options =>
-// {
-//     options.AddDocumentTransformer((document, _, _) =>
-//     {
-//         document.Info.Title = "Bus Ticketing — Booking Service";
-//         document.Info.Version = "v1";
-//         document.Info.Description = "Trip search, seat holds, booking lifecycle. See /scalar for the interactive reference.";
-
-//         document.Components ??= new OpenApiComponents();
-//         document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
-//         {
-//             Type = SecuritySchemeType.Http,
-//             Scheme = "bearer",
-//             BearerFormat = "JWT",
-//             Description = "Paste a raw JWT access token."
-//         };
-//         return Task.CompletedTask;
-//     });
-// }
-);
+// --- API documentation: native OpenAPI + Scalar only -------------------------
+// Swashbuckle/Swagger is deliberately NOT used here: on .NET 10, Swashbuckle
+// (still built against the OpenAPI.NET v1 object model) and the framework's
+// own Microsoft.AspNetCore.OpenApi (now on OpenAPI.NET v2) disagree on the
+// shape of OpenApiDocument/OpenApiSchema — trying to register both throws at
+// startup, which is almost certainly the "builds fine, crashes on run" you
+// hit. Scalar renders the native /openapi/v1.json document directly, so it
+// doesn't need Swashbuckle at all. If you specifically need swagger.json for
+// an external tool, generate it via `dotnet build` + the
+// Microsoft.Extensions.ApiDescription.Server tooling instead of adding
+// Swashbuckle back in.
+builder.Services.AddOpenApi("v1");
 
 builder.Services.AddCors(options =>
 {
@@ -161,9 +123,9 @@ builder.Services.AddCors(options =>
 
 // --- Health checks (surfaced at /health; each dependency also feeds Grafana via its own exporter) ---
 builder.Services.AddHealthChecks()
-    .AddNpgsql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty)
+    .AddNpgSql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty, name: "postgres")
     .AddRabbitMQ(name: "rabbitmq")
-    .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379");
+    .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379", name: "redis");
 
 var app = builder.Build();
 
@@ -172,27 +134,12 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
-app.MapOpenApi(); // -> /openapi/v1.json, consumed by Scalar below
-app.MapScalarApiReference("/scalar"
-// , options =>
-// {
-//     options
-//         .WithTitle("Bus Ticketing — Booking Service")
-//         .WithTheme(ScalarTheme.Purple)
-//         .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-//         .WithPreferredScheme("Bearer");
-// }
-);
-app.MapScalarApiReference("/scalar");
-if (app.Environment.IsDevelopment())
+app.MapOpenApi();                          // -> /openapi/v1.json
+app.MapScalarApiReference("/scalar", options =>
 {
-    // app.UseSwagger();
-    // app.UseSwaggerUI(options =>
-    // {
-    //     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking Service v1");
-    //     options.DocumentTitle = "Bus Ticketing — Booking Service";
-    // });
-}
+    options.WithTitle("Bus Ticketing — Booking Service");
+    options.WithTheme(ScalarTheme.Purple);
+});
 
 app.UseCors("AllowConfiguredOrigins");
 app.UseAuthentication();
@@ -204,9 +151,11 @@ app.MapHealthChecks("/health");
 app.MapPrometheusScrapingEndpoint("/metrics");
 
 // Applies pending EF Core migrations on startup in dev/demo environments.
-// In production this is a deliberate no-op — migrations are applied via the
-// CI/CD pipeline's dedicated migration step, never by an app instance racing
-// other replicas on boot.
+// REQUIRES migrations to already exist (dotnet ef migrations add InitialCreate)
+// — see docs/RUNBOOK.md step 1. If no migration files exist yet, this call
+// silently does nothing and every request will fail with "relation does not
+// exist", which is the other very likely cause of "builds fine, doesn't
+// actually work end-to-end".
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();

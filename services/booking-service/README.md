@@ -5,24 +5,34 @@ Ticketing platform. First fully-implemented vertical slice of the wider
 [Enterprise Transport Platform](../../MASTER_SPEC.md) roadmap. Targets
 **.NET 10**.
 
+📚 **New here?** Start with [`docs/RUNBOOK.md`](../../docs/RUNBOOK.md) for a
+step-by-step from clone to a working booking, or
+[`docs/README.md`](../../docs/README.md) for the full documentation index
+(architecture, C4 diagrams, ERD, CRUD guides, observability guide).
+
 ## Architecture
 
 Clean Architecture (dependency rule: Api -> Infrastructure -> Application -> Domain)
 combined with vertical slices inside Application — each use case
 (`SearchTrips`, `CreateBooking`, `CancelBooking`, `GetBookingById`) is a
-self-contained folder with its request, validator, handler and DTO, instead
-of being scattered across generic `Services/` and `Repositories/` folders.
+self-contained folder with its request, validator, handler and DTO. See
+[`docs/diagrams/C4_Component.md`](../../docs/diagrams/C4_Component.md) for
+the diagram and [`docs/CRUD_GUIDE_BACKEND.md`](../../docs/CRUD_GUIDE_BACKEND.md)
+for how to add a new feature following this pattern.
 
 ```
 src/
   BookingService.Domain          Entities, value objects, domain events — zero framework dependencies
   BookingService.Application     CQRS handlers (MediatR), FluentValidation, ports (interfaces)
   BookingService.Infrastructure  EF Core + Npgsql, Redis cache-aside, transactional outbox, RabbitMQ, OTel metrics
-  BookingService.Api             Minimal API endpoints, JWT auth, Serilog+Seq, Swagger + Scalar/OpenAPI, ProblemDetails
+  BookingService.Api             Minimal API endpoints, JWT auth, Serilog+Seq, native OpenAPI + Scalar, ProblemDetails
 tests/
   BookingService.UnitTests         Domain + handler tests (xUnit, FluentAssertions, EF InMemory, NSubstitute)
   BookingService.IntegrationTests  Full-stack tests against real Postgres/RabbitMQ/Redis via Testcontainers
-  load/                            k6 load test (search) + stress test (concurrent seat-booking correctness)
+performance-tests/
+  k6/          Primary, CI-friendly load + stress test scripts
+  jmeter/      Same coverage, JMeter .jmx test plan
+  nbomber/     Same coverage, .NET-native (NBomber) test project
 ```
 
 ## What's actually implemented (not stubbed)
@@ -30,76 +40,70 @@ tests/
 - **Seat-safe booking**: `Trip.HoldSeats` enforces "no double allocation" as a
   domain invariant; `CreateBookingHandler` additionally relies on optimistic
   concurrency (Postgres `xmin` mapped onto `Trip.Version`) so two concurrent
-  requests racing for the same seat can't both win, even under real load —
-  the loser gets a `409 Conflict` (`SeatUnavailableException`), not a corrupt
-  booking. `tests/load/create-booking-stress-test.js` proves this under 50
-  concurrent virtual users, not just a single-threaded unit test.
-- **Transactional outbox**: domain events are written to the `outbox_messages`
-  table in the *same* database transaction as the aggregate change, then
-  relayed to RabbitMQ by a background `OutboxProcessor`.
-- **Redis cache-aside**: `SearchTrips` results are cached for 30s per query
-  (the highest-traffic, most-repeated read on the platform); `CreateBooking`
-  / `CancelBooking` evict the cache on write so seat counts don't go stale.
-  The cache fails open — a Redis outage degrades to "always hits Postgres",
-  never a 500.
-- **CQRS via MediatR**: commands mutate aggregates through domain invariants;
-  queries read via direct EF Core projections.
-- **Observability**: OpenTelemetry traces (OTLP -> Jaeger) and metrics
-  (Prometheus scrape at `/metrics` -> Grafana dashboard), structured logs to
-  both console and Seq, plus custom business metrics
-  (`bookings_created_total`, `booking_seat_conflicts_total`, ...) — see
-  `infrastructure/monitoring/`.
-- **API docs you can actually click and run**: Swagger UI at `/swagger` and
-  a modern OpenAPI reference (Scalar) at `/scalar`, both with real filled-in
-  request/response examples — not empty schemas. Plus a Postman collection
-  (`../../postman/`) whose pre-request script mints and attaches a bearer
-  token to every request automatically.
+  requests racing for the same seat can't both win. Proven under 50
+  concurrent virtual users by `performance-tests/*/create-booking-stress-test.*`,
+  not just a single-threaded unit test.
+- **Transactional outbox** → RabbitMQ (see `docs/diagrams/Sequence_Diagrams.md`).
+- **Redis cache-aside** on `SearchTrips` (30s TTL, evicted on write, fails open).
+- **CQRS via MediatR** — commands mutate aggregates through domain invariants; queries read via direct EF Core projections.
+- **Pagination**: every list endpoint defaults to page 1 / 10 results if
+  omitted, and returns metadata in an `X-Pagination` response header — see
+  [`docs/api/API_PAGINATION.md`](../../docs/api/API_PAGINATION.md).
+- **Observability**: OpenTelemetry traces (OTLP → Jaeger) and metrics
+  (Prometheus scrape at `/metrics` → Grafana dashboard), structured logs to
+  console + Seq, custom business metrics (`bookings_created_total`,
+  `booking_seat_conflicts_total`, ...). Full how-to-query walkthrough in
+  [`docs/OBSERVABILITY_GUIDE.md`](../../docs/OBSERVABILITY_GUIDE.md).
+- **API docs**: native OpenAPI document at `/openapi/v1.json`, rendered
+  interactively by **Scalar** at `/scalar` — click any endpoint, "Try it".
+  Real request/response examples live in
+  [`docs/api/API_EXAMPLES.md`](../../docs/api/API_EXAMPLES.md) rather than
+  inline in the endpoint code (see the note below on why Swagger isn't used).
+  Plus a Postman collection (`../../postman/`) whose pre-request script
+  mints and attaches a bearer token to every request automatically.
 - **Validation & error shape**: FluentValidation runs as a MediatR pipeline
   behavior; `ExceptionHandlingMiddleware` translates domain exceptions into
   RFC 7807 `ProblemDetails`.
+
+### Why Scalar only, not Swagger + Scalar
+
+On .NET 10, Swashbuckle (still built against OpenAPI.NET v1) and the
+framework's own `Microsoft.AspNetCore.OpenApi` (now on OpenAPI.NET v2)
+disagree on the shape of `OpenApiDocument`/`OpenApiSchema`. Registering both
+in the same app throws at startup — the exact "builds fine, crashes on run"
+symptom this repo hit after the .NET 10 upgrade. Scalar reads the native
+`/openapi/v1.json` document directly, so it doesn't need Swashbuckle at all.
+See the comment above the OpenAPI registration in `Program.cs`.
 
 ## What's intentionally out of scope for this slice
 
 Payment processing, notification delivery, RBAC beyond a bearer-token check,
 multi-tenancy, and the other 7 services in `MASTER_SPEC.md` are not built
-here — see `ROADMAP.md` for sequencing.
+here — see `ROADMAP.md` for sequencing, and the root README's "Known gaps"
+for the current honest list (Auth Service included).
 
 ## Running locally
 
-Requires the .NET 10 SDK, Node 22, and Docker. This was developed with real
-compilation and package restore this time around (the initial vertical slice
-was hand-written in a sandbox with no SDK access — see git history); still,
-review before relying on it, especially the OpenTelemetry Redis
-instrumentation call flagged with a comment in `Program.cs`, which is
-version-sensitive.
+**Full step-by-step**: [`docs/RUNBOOK.md`](../../docs/RUNBOOK.md). Short version:
 
 ```bash
 # Whole stack: Postgres, RabbitMQ, Redis, Seq, Jaeger, Prometheus, Grafana, both frontends
 cd infrastructure/docker
 docker compose up --build
 
-# Or just the backend, locally:
+# Or just the backend, locally (needs migrations generated first — see RUNBOOK.md step 2):
 cd services/booking-service
 dotnet restore
-dotnet ef migrations add InitialCreate \
-  --project src/BookingService.Infrastructure --startup-project src/BookingService.Api
-dotnet ef database update \
-  --project src/BookingService.Infrastructure --startup-project src/BookingService.Api
+dotnet ef migrations add InitialCreate --project src/BookingService.Infrastructure --startup-project src/BookingService.Api
+dotnet ef database update --project src/BookingService.Infrastructure --startup-project src/BookingService.Api
 dotnet run --project src/BookingService.Api
-```
-
-Then seed some data and try it:
-
-```bash
-psql "postgresql://booking_svc:changeme@localhost:5432/booking_service" -f ../../scripts/seed-demo-data.sql
 ```
 
 | What | Where |
 |---|---|
-| Swagger UI | http://localhost:8080/swagger |
 | Scalar API reference | http://localhost:8080/scalar |
 | Raw OpenAPI document | http://localhost:8080/openapi/v1.json |
-| Postman collection | `../../postman/` (see its README for the auto-bearer-token trick) |
+| Postman collection | `../../postman/` |
 | Seq (structured logs) | http://localhost:8081 |
 | Jaeger (traces) | http://localhost:16686 |
 | Prometheus (raw metrics) | http://localhost:9090 |
@@ -108,15 +112,14 @@ psql "postgresql://booking_svc:changeme@localhost:5432/booking_service" -f ../..
 
 ## Load & stress testing
 
-```bash
-cd tests/load
-k6 run -e BASE_URL=http://localhost:8080 search-trips-load-test.js
-k6 run -e BASE_URL=http://localhost:8080 -e TRIP_ID=<seeded-trip-id> -e ACCESS_TOKEN=<dev-jwt> create-booking-stress-test.js
-```
+Three equivalent options — pick whichever fits your team's toolchain, each
+has its own README with exact run commands:
 
-See `tests/load/README.md` for what each threshold means and how to get a
-dev JWT (the Postman collection's pre-request script generates one the same
-way, or use it directly).
+```bash
+cd performance-tests/k6      && cat README.md   # primary, CI-friendly
+cd performance-tests/jmeter  && cat README.md   # GUI/JMeter-standardized teams
+cd performance-tests/nbomber && cat README.md   # .NET-native
+```
 
 ## Running tests
 
