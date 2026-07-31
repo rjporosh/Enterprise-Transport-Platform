@@ -1,0 +1,68 @@
+<main class="min-h-screen bg-ink-950 px-6 py-10">
+  <div class="mx-auto max-w-3xl">
+    @if (!store.selectedTrip()) {
+      <p class="text-white/60">No trip selected. <a routerLink="/" class="text-saffron-500 underline">Go back to search</a>.</p>
+    } @else {
+      <p class="text-saffron-500 text-sm tracking-[0.2em] uppercase mb-2">Choose your seats</p>
+      <h1 class="font-display text-3xl text-white mb-6">
+        {{ store.selectedTrip()?.originCity }} &rarr; {{ store.selectedTrip()?.destinationCity }}
+      </h1>
+
+      <div class="grid grid-cols-6 gap-2 mb-8 max-w-sm">
+        @for (seat of seatLabels(); track seat) {
+          <button type="button" (click)="toggleSeat(seat)"
+                  [class.bg-saffron-500]="selectedSeats().includes(seat)"
+                  [class.text-ink-950]="selectedSeats().includes(seat)"
+                  [class.bg-ink-800]="!selectedSeats().includes(seat)"
+                  [class.text-white]="!selectedSeats().includes(seat)"
+                  class="border border-ink-700 rounded-md py-2 text-sm font-medium transition-colors hover:border-saffron-500 focus:outline-none focus:ring-2 focus:ring-saffron-500">
+            {{ seat }}
+          </button>
+        }
+      </div>
+
+      @if (passengerFormsArray.length > 0) {
+        <form class="flex flex-col gap-4">
+          @for (group of passengerFormsArray.controls; track $index) {
+            <fieldset [formGroup]="group" class="bg-ink-800 border border-ink-700 rounded-lg p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <legend class="text-saffron-500 text-sm px-1">Seat {{ group.value.seatNumber }}</legend>
+
+              <label class="flex flex-col gap-1 md:col-span-2">
+                <span class="text-xs text-white/60">Passenger full name</span>
+                <input formControlName="fullName" type="text"
+                       class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-saffron-500" />
+              </label>
+
+              <label class="flex flex-col gap-1">
+                <span class="text-xs text-white/60">Age</span>
+                <input formControlName="age" type="number" min="1" max="120"
+                       class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-saffron-500" />
+              </label>
+
+              <label class="flex flex-col gap-1">
+                <span class="text-xs text-white/60">Gender</span>
+                <select formControlName="gender"
+                        class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-saffron-500">
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+            </fieldset>
+          }
+        </form>
+
+        @if (store.error()) {
+          <p class="text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-4 py-3 mt-4">{{ store.error() }}</p>
+        }
+
+        <button (click)="onContinue()" [disabled]="store.submitting()"
+                class="mt-6 bg-saffron-500 disabled:opacity-50 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-6 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+          {{ store.submitting() ? 'Holding your seats...' : 'Confirm and hold seats' }}
+        </button>
+      } @else {
+        <p class="text-white/60">Tap a seat above to add a passenger.</p>
+      }
+    }
+  </div>
+</main>

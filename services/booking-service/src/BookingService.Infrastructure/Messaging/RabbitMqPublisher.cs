@@ -1,0 +1,60 @@
+using System.Text;
+using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
+
+namespace BookingService.Infrastructure.Messaging;
+
+/// <summary>
+/// Publishes to a durable topic exchange. Connection/channel are created
+/// lazily and reused; RabbitMQ.Client's IModel is not thread-safe for
+/// concurrent publish, so in a high-throughput service this would be pooled —
+/// left as a single channel here since OutboxProcessor publishes sequentially.
+/// </summary>
+public sealed class RabbitMqPublisher : IMessageBusPublisher, IDisposable
+{
+    private readonly RabbitMqOptions _options;
+    private readonly Lazy<IConnection> _connection;
+    private readonly Lazy<IModel> _channel;
+
+    public RabbitMqPublisher(IOptions<RabbitMqOptions> options)
+    {
+        _options = options.Value;
+
+        _connection = new Lazy<IConnection>(() =>
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = _options.HostName,
+                Port = _options.Port,
+                UserName = _options.UserName,
+                Password = _options.Password,
+                DispatchConsumersAsync = true
+            };
+            return factory.CreateConnection("booking-service");
+        });
+
+        _channel = new Lazy<IModel>(() =>
+        {
+            var channel = _connection.Value.CreateModel();
+            channel.ExchangeDeclare(_options.Exchange, ExchangeType.Topic, durable: true);
+            return channel;
+        });
+    }
+
+    public Task PublishAsync(string routingKey, string payload, CancellationToken cancellationToken = default)
+    {
+        var body = Encoding.UTF8.GetBytes(payload);
+        var properties = _channel.Value.CreateBasicProperties();
+        properties.Persistent = true;
+        properties.ContentType = "application/json";
+
+        _channel.Value.BasicPublish(_options.Exchange, routingKey, properties, body);
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        if (_channel.IsValueCreated) _channel.Value.Dispose();
+        if (_connection.IsValueCreated) _connection.Value.Dispose();
+    }
+}

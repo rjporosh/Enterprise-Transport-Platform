@@ -1,0 +1,17 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Node
+node_modules/
+dist/
+out-tsc/
+.angular/
+
+# Env / secrets
+.env
+*.local
+
+# OS
+.DS_Store

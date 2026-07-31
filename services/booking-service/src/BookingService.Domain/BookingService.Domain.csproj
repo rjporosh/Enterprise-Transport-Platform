@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>BookingService.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Only dependency the Domain layer takes on: MediatR.Contracts gives us
+      INotification so domain events can be dispatched via MediatR without
+      pulling the full MediatR pipeline (or EF Core, or ASP.NET) into Domain.
+      Everything else about Clean Architecture's "Domain has zero outward
+      dependencies" rule still holds.
+    -->
+    <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,75 @@
+<main class="min-h-screen bg-ink-950">
+  <header class="border-b border-ink-800 bg-ink-900/60">
+    <div class="mx-auto max-w-5xl px-6 py-10">
+      <p class="text-saffron-500 text-sm tracking-[0.2em] uppercase mb-2">Bus Ticketing</p>
+      <h1 class="font-display text-4xl md:text-5xl font-medium text-white">Where's the road taking you?</h1>
+    </div>
+  </header>
+
+  <section class="mx-auto max-w-5xl px-6 -mt-6">
+    <form [formGroup]="form" (ngSubmit)="onSearch()"
+          class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-ink-800 border border-ink-700 rounded-xl p-4 shadow-xl">
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-white/60">From</span>
+        <input formControlName="origin" type="text" placeholder="Dhaka"
+               class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-saffron-500" />
+      </label>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-white/60">To</span>
+        <input formControlName="destination" type="text" placeholder="Chattogram"
+               class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-saffron-500" />
+      </label>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-white/60">Departure date</span>
+        <input formControlName="date" type="date"
+               class="bg-ink-900 border border-ink-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-saffron-500" />
+      </label>
+
+      <button type="submit"
+              class="self-end bg-saffron-500 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-4 py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+        Search buses
+      </button>
+    </form>
+  </section>
+
+  <section class="mx-auto max-w-5xl px-6 py-10">
+    @if (store.loading()) {
+      <p class="text-white/60">Searching...</p>
+    }
+
+    @if (store.error()) {
+      <p class="text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-4 py-3">{{ store.error() }}</p>
+    }
+
+    @if (store.hasSearched() && !store.loading() && store.results().length === 0 && !store.error()) {
+      <p class="text-white/60">No buses found for that route and date. Try a different date.</p>
+    }
+
+    <ul class="flex flex-col gap-3">
+      @for (trip of store.results(); track trip.tripId) {
+        <li class="bg-ink-800 border border-ink-700 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex-1">
+            <p class="text-white/60 text-sm">{{ trip.busType }} &middot; {{ trip.operatorPlateNumber }}</p>
+            <p class="font-display text-xl text-white mt-1">
+              {{ trip.departureUtc | date:'shortTime' }} &rarr; {{ trip.arrivalUtc | date:'shortTime' }}
+            </p>
+            <p class="text-white/60 text-sm mt-1">{{ trip.originCity }} to {{ trip.destinationCity }}</p>
+          </div>
+
+          <div class="text-right">
+            <p class="font-display text-2xl text-saffron-500">{{ trip.pricePerSeat | number:'1.0-0' }} {{ trip.currency }}</p>
+            <p class="text-white/60 text-sm">{{ trip.availableSeats }} of {{ trip.totalSeats }} seats left</p>
+          </div>
+
+          <button (click)="selectTrip(trip.tripId)"
+                  [disabled]="trip.availableSeats === 0"
+                  class="bg-saffron-500 disabled:bg-ink-700 disabled:text-white/40 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-5 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+            {{ trip.availableSeats === 0 ? 'Sold out' : 'Select seats' }}
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+</main>

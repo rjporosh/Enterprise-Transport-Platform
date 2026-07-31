@@ -1,0 +1,53 @@
+<main class="min-h-screen bg-ink-950 px-6 py-10">
+  <div class="mx-auto max-w-xl">
+    @if (loading()) {
+      <p class="text-white/60">Loading your booking...</p>
+    } @else if (!booking()) {
+      <p class="text-white/60">We couldn't find that booking. <a routerLink="/" class="text-saffron-500 underline">Search again</a>.</p>
+    } @else {
+      <p class="text-saffron-500 text-sm tracking-[0.2em] uppercase mb-2">Seats held</p>
+      <h1 class="font-display text-3xl text-white mb-1">Complete payment within {{ holdMinutesRemaining() }} min</h1>
+      <p class="text-white/60 mb-8">Your seats are held — they'll be released automatically if payment isn't completed in time.</p>
+
+      <div class="bg-ink-800 border border-ink-700 rounded-xl p-6">
+        <dl class="grid grid-cols-2 gap-y-3 text-sm">
+          <dt class="text-white/60">Booking reference</dt>
+          <dd class="text-white text-right font-mono">{{ booking()!.bookingId.slice(0, 8) }}</dd>
+
+          <dt class="text-white/60">Status</dt>
+          <dd class="text-right">
+            <span class="bg-saffron-500/20 text-saffron-500 px-2 py-0.5 rounded-full text-xs font-medium">
+              {{ booking()!.status }}
+            </span>
+          </dd>
+
+          <dt class="text-white/60">Seats</dt>
+          <dd class="text-white text-right">{{ booking()!.seats.length }}</dd>
+
+          <dt class="text-white/60">Total</dt>
+          <dd class="text-saffron-500 text-right font-display text-lg">
+            {{ booking()!.totalAmount | number:'1.0-0' }} {{ booking()!.currency }}
+          </dd>
+        </dl>
+
+        <hr class="border-ink-700 my-4" />
+
+        <ul class="flex flex-col gap-2">
+          @for (seat of booking()!.seats; track seat.seatNumber) {
+            <li class="flex justify-between text-sm">
+              <span class="text-white/80">Seat {{ seat.seatNumber }}</span>
+              <span class="text-white/60">{{ seat.passengerFullName }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <button class="mt-6 w-full bg-saffron-500 hover:bg-saffron-600 text-ink-950 font-semibold rounded-md px-6 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-white">
+        Proceed to payment
+      </button>
+      <p class="text-white/40 text-xs mt-3 text-center">
+        Payment is handled by the Payment Service (see ROADMAP.md) — not part of this vertical slice.
+      </p>
+    }
+  </div>
+</main>

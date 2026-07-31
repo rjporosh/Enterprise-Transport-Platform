@@ -1,0 +1,90 @@
+# Local dev/demo stack for the Booking Service vertical slice.
+# Other services in MASTER_SPEC.md (Auth, Payment, Notification, ...) are not
+# built yet — see ROADMAP.md — so they aren't wired in here either.
+#
+# NOTE: not run/verified in the environment that generated this repo (no
+# Docker/network access there). Reviewed by hand for correctness; run
+# `docker compose config` locally before relying on it.
+
+name: bus-ticketing
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: booking_service
+      POSTGRES_USER: booking_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking_svc -d booking_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: bus-ticketing-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  booking-service:
+    build:
+      context: ../../services/booking-service
+      dockerfile: src/BookingService.Api/Dockerfile
+    container_name: bus-ticketing-booking-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__BookingDb: "Host=postgres;Port=5432;Database=booking_service;Username=booking_svc;Password=changeme"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+      Cors__AllowedOrigins__0: "http://localhost:4200"
+      Cors__AllowedOrigins__1: "http://localhost:5173"
+    ports:
+      - "8080:8080"
+
+  customer-web:
+    build:
+      context: ../../apps/angular-client/bus-ticketing-customer-web
+      dockerfile: Dockerfile
+    container_name: bus-ticketing-customer-web
+    restart: unless-stopped
+    depends_on:
+      - booking-service
+    ports:
+      - "4200:80"
+
+  admin-console:
+    build:
+      context: ../../apps/react-admin/bus-ticketing-admin
+      dockerfile: Dockerfile
+    container_name: bus-ticketing-admin-console
+    restart: unless-stopped
+    depends_on:
+      - booking-service
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres-data:
