@@ -1,7 +1,6 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "outDir": "./dist/out-tsc",
     "strict": true,
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -17,10 +16,9 @@
     "target": "ES2022",
     "module": "ES2022",
     "lib": ["ES2022", "dom"],
-    "baseUrl": ".",
     "paths": {
       "@shared-ui/*": ["../../shared-ui-library/angular/src/lib/*"],
-      "@app/*": ["src/app/*"]
+      "@app/*": ["./src/app/*"]
     }
   },
   "angularCompilerOptions": {
