@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
-import { authApi } from '../api/auth.api';
-import { AdminAuthUser, LoginRequest } from '../models/auth.model';
+import { authApi } from './api/auth.api';
+import { AdminAuthUser, LoginRequest } from './models/auth.model';
 
 const TOKEN_KEY = 'admin_access_token';
 const USER_KEY = 'admin_auth_user';
