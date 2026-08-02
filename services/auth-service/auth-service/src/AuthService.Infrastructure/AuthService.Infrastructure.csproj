@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AuthService.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!--
+      Database portability (MASTER_SPEC.md requirement: "switch easily to
+      any db"). All three providers below are always referenced; which one
+      is actually instantiated is a runtime switch on
+      "Database:Provider" in appsettings (Postgres | SqlServer | MySql) —
+      see DependencyInjection.cs. This costs a slightly larger deploy
+      package in exchange for zero-recompile provider switching, which is
+      the right trade for a reference/demo platform. A leaner production
+      fork would trim this to the one provider actually deployed.
+      Oracle is deliberately NOT wired in: Oracle.EntityFrameworkCore.Core
+      is dual-licensed/commercial and its EF Core 10 compatibility could
+      not be verified in this network-isolated environment. Adding it is a
+      2-line change (package ref + a UseOracle branch below) — documented
+      in docs/architecture/auth-service-architecture.md, "Database portability".
+    -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <!--
+      Pomelo has not shipped an official EF Core 10-compatible release as of
+      this writing — their EF Core 10 upgrade (PomeloFoundation/Pomelo.EntityFrameworkCore.MySql
+      PR #2019) is still work-in-progress upstream. Pomelo 9.0.0 is reported
+      to work against EF Core 10 for the common CRUD/query scenarios this
+      service uses, but NuGet correctly flags the declared dependency
+      constraint mismatch (NU1608) since Pomelo 9.x declares
+      Microsoft.EntityFrameworkCore.Relational 9.x, not 10.x. Suppressed here
+      deliberately, not silently — see docs/architecture/auth-service-architecture.md,
+      "Database portability" for the tracking note. Re-evaluate (and drop
+      this NoWarn) once Pomelo ships a stable EF Core 10 release.
+    -->
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" NoWarn="NU1608" />
+
+    <!--
+      Transitive dependency (pulled in by Microsoft.EntityFrameworkCore.SqlServer
+      -> Microsoft.Data.SqlClient, for Always Encrypted XML key-store support)
+      resolves to a version with known DoS advisories (GHSA-23rf-6693-g89p and
+      others). Pinned directly to a patched version to override it — NuGet
+      resolves the highest version requested across the graph, so this wins
+      over whatever Microsoft.Data.SqlClient asks for.
+    -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <!-- IMeterFactory (used by AuthMetrics) — referenced explicitly rather than relying on it arriving transitively via Hosting.Abstractions. -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+
+    <!-- JWT issuance (JwtTokenService uses these to *write* tokens; the Api project uses Microsoft.AspNetCore.Authentication.JwtBearer to *validate* them). -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AuthService.Application\AuthService.Application.csproj" />
+  </ItemGroup>
+
+</Project>
