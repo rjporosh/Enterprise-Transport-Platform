@@ -1,0 +1,11 @@
+{
+  "name": "@transport/shared-ui-angular",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared Angular standalone-component library for the Enterprise Transport Platform. Consumed as TypeScript source via the '@shared-ui/angular' path alias (tsconfig paths) — no separate ng-packagr build/publish step required.",
+  "peerDependencies": {
+    "@angular/common": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "@angular/forms": "^22.0.0"
+  }
+}

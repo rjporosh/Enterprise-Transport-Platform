@@ -9,5 +9,21 @@ export const routes: Routes = [
     path: 'book',
     loadChildren: () => import('./features/booking/routes').then((m) => m.BOOKING_ROUTES)
   },
-  { path: '**', redirectTo: '' }
+  {
+    path: 'auth',
+    loadChildren: () => import('./features/auth/routes').then((m) => m.AUTH_ROUTES)
+  },
+  {
+    path: 'profile',
+    loadChildren: () => import('./features/profile/routes').then((m) => m.PROFILE_ROUTES)
+  },
+  {
+    path: 'payment',
+    loadChildren: () => import('./features/payment/routes').then((m) => m.PAYMENT_ROUTES)
+  },
+  {
+    path: 'not-found',
+    loadComponent: () => import('./shared/pages/not-found-page/not-found-page.component').then((m) => m.NotFoundPageComponent)
+  },
+  { path: '**', redirectTo: 'not-found' }
 ];

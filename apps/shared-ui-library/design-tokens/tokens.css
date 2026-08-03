@@ -1,0 +1,57 @@
+/**
+ * @transport/design-tokens
+ * -----------------------------------------------------------------------
+ * Single source of truth for the "night coach" brand — deep indigo (the
+ * road at dusk) with a saffron accent (the ticket-stub color). Both the
+ * customer web app and the admin console import this file so a brand
+ * change happens in exactly one place.
+ *
+ * Consumed as plain CSS custom properties (framework-agnostic) AND as the
+ * raw values behind `tailwind-preset.cjs`, so components can use either
+ * Tailwind utility classes or `var(--color-*)` directly.
+ */
+
+:root {
+  /* ---- Brand palette --------------------------------------------- */
+  --color-ink-950: #0b1220;
+  --color-ink-900: #121a2e;
+  --color-ink-800: #1b2740;
+  --color-ink-700: #28365a;
+  --color-ink-600: #3a4b74;
+
+  --color-saffron-400: #f0b95c;
+  --color-saffron-500: #e8a33d;
+  --color-saffron-600: #d08a22;
+  --color-saffron-700: #ab6d16;
+
+  --color-slate-50: #f5f7fa;
+  --color-slate-100: #eef1f6;
+  --color-slate-200: #dde3ec;
+
+  /* ---- Semantic colors ---------------------------------------------- */
+  --color-success-500: #2fb673;
+  --color-success-bg: rgba(47, 182, 115, 0.12);
+  --color-danger-500: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-warning-500: #f2b90b;
+  --color-warning-bg: rgba(242, 185, 11, 0.12);
+  --color-info-500: #3d8ee8;
+  --color-info-bg: rgba(61, 142, 232, 0.12);
+
+  /* ---- Typography ----------------------------------------------------- */
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* ---- Shape / elevation ------------------------------------------ */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --shadow-card: 0 8px 30px rgba(11, 18, 32, 0.25);
+  --shadow-popover: 0 12px 40px rgba(11, 18, 32, 0.4);
+
+  /* ---- Motion ------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BookingStore } from '../../../../state/booking/booking.store';
 import { PassengerInput } from '../../../../shared/types/booking.model';
@@ -54,7 +54,7 @@ export class SeatSelectionPageComponent {
     }
   }
 
-  protected get passengerFormsArray(): FormArray {
+  protected get passengerFormsArray() {
     return this.passengerForms;
   }
 

@@ -15,7 +15,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@shared-ui/react": ["../../shared-ui-library/react/src/index.ts"],
+      "@shared-ui/react/*": ["../../shared-ui-library/react/src/*"]
+    }
   },
   "include": ["src"]
 }

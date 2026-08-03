@@ -1,0 +1,19 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
+import { Booking } from '../../../shared/types/booking.model';
+
+@Injectable({ providedIn: 'root' })
+export class MyBookingsService {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiBaseUrl}/bookings`;
+
+  listMine(): Observable<Booking[]> {
+    return this.http.get<Booking[]>(`${this.baseUrl}/mine`);
+  }
+
+  cancel(bookingId: string, reason: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/${bookingId}/cancel`, { reason });
+  }
+}

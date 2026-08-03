@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AuthService.Api</RootNamespace>
+    <UserSecretsId>auth-service-4f1c9c2a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+  <PrivateAssets>all</PrivateAssets>
+  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+</PackageReference>
+    <!-- Native minimal-API OpenAPI document generation, served at /openapi/v1.json — see Program.cs for why Swashbuckle isn't used alongside it. -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <!-- Scalar renders that document as a modern, "click to try" API reference at /scalar. -->
+    <PackageReference Include="Scalar.AspNetCore" Version="2.1.2" />
+
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+    <!--
+      AspNetCore.HealthChecks.Rabbitmq 9.0.0 dropped the connection-string
+      overload entirely — it now requires the caller to hand it a live
+      IConnection (via a factory delegate), a bigger DI change than a health
+      check warrants here. AspNetCore.HealthChecks.Rabbitmq.v6 kept the
+      original rabbitConnectionString: string API and targets RabbitMQ.Client
+      v6.x, which matches the RabbitMQ.Client 6.8.1 already pinned in
+      AuthService.Infrastructure — so this is the consistent choice, not a
+      workaround.
+    -->
+    <PackageReference Include="AspNetCore.HealthChecks.Rabbitmq.v6" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+
+    <!--
+      OpenTelemetry.Api 1.10.0-1.11.1 has a DoS advisory (GHSA-8785-wc3w-h8q6,
+      malformed tracestate/traceparent headers spike CPU) fixed in 1.11.2;
+      pinned to 1.17.0 (current stable core release train as of this fix,
+      verified on nuget.org) to be well past it. OpenTelemetry.Instrumentation.Runtime
+      was missing entirely despite AddRuntimeInstrumentation() being called
+      in Program.cs — added below; that would have been the next build
+      error once the Application-layer errors were fixed.
+    -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <!-- Contrib instrumentation/exporter packages still ship beta-only releases upstream — no stable line exists yet. -->
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.17.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.17.0-beta.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AuthService.Application\AuthService.Application.csproj" />
+    <ProjectReference Include="..\AuthService.Infrastructure\AuthService.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
