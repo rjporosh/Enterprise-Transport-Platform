@@ -122,9 +122,16 @@ builder.Services.AddCors(options =>
 });
 
 // --- Health checks (surfaced at /health; each dependency also feeds Grafana via its own exporter) ---
+var rabbitMqUser = builder.Configuration["RabbitMq:UserName"] ?? "guest";
+var rabbitMqPass = builder.Configuration["RabbitMq:Password"] ?? "guest";
+var rabbitMqHost = builder.Configuration["RabbitMq:HostName"] ?? "localhost";
+var rabbitMqPort = builder.Configuration["RabbitMq:Port"] ?? "5672";
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty, name: "postgres")
-    .AddRabbitMQ(name: "rabbitmq")
+    .AddRabbitMQ(
+        rabbitConnectionString: $"amqp://{rabbitMqUser}:{rabbitMqPass}@{rabbitMqHost}:{rabbitMqPort}",
+        name: "rabbitmq")
     .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379", name: "redis");
 
 var app = builder.Build();

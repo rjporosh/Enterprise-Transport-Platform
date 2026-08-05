@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using BookingService.Application.Common.Interfaces;
+using Microsoft.Extensions.Diagnostics.Metrics;
 
 namespace BookingService.Infrastructure.Observability;
 
