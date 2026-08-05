@@ -14,11 +14,13 @@ public abstract class AggregateRoot : Entity
     public void ClearDomainEvents() => _domainEvents.Clear();
 
     /// <summary>
-    /// Optimistic concurrency token, mapped to Postgres' native `xmin` system
-    /// column on Bus (see BusConfiguration) — genuinely used here, unlike
-    /// Auth Service's User aggregate, because bus status changes (e.g.
-    /// "assign to a trip" vs "mark under maintenance") are exactly the kind
-    /// of concurrent-write race this exists to catch.
+    /// Optimistic concurrency token. Bus Service is DB-provider-switchable
+    /// (Postgres/SqlServer/MySQL — see Infrastructure/DependencyInjection.cs),
+    /// so a native concurrency column (Postgres `xmin`, SQL Server
+    /// `rowversion`) isn't portable across all of them. Left unmapped
+    /// (`Ignore`d in BusConfiguration) rather than faked with a
+    /// provider-specific column — same trade-off Auth Service's User
+    /// aggregate makes, for the same reason.
     /// </summary>
     public uint Version { get; set; }
 }
