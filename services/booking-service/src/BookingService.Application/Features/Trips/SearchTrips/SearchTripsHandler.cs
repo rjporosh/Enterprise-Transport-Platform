@@ -10,14 +10,47 @@ namespace BookingService.Application.Features.Trips.SearchTrips;
 /// Read-side handler: queries directly via EF Core projections rather than
 /// going through the Trip aggregate, per CQRS — reads don't need aggregate
 /// invariants, just a fast, shaped DTO.
+///
+/// Cache-aside via Redis: trip search is the highest-traffic, most-repeated
+/// read on the whole platform (the same route+date gets hammered by every
+/// customer looking at that trip) and tolerates a few seconds of staleness
+/// — a seat going from 3 -> 2 available a moment late costs nothing, since
+/// CreateBookingHandler re-checks real availability transactionally anyway.
+/// That's what makes it a safe cache candidate; Booking reads/writes are not
+/// cached for exactly the opposite reason.
 /// </summary>
 public sealed class SearchTripsHandler : IRequestHandler<SearchTripsQuery, PagedResult<TripSearchResultDto>>
 {
-    private readonly IBookingDbContext _context;
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
 
-    public SearchTripsHandler(IBookingDbContext context) => _context = context;
+    private readonly IBookingDbContext _context;
+    private readonly ICacheService _cache;
+
+    public SearchTripsHandler(IBookingDbContext context, ICacheService cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
 
     public async Task<PagedResult<TripSearchResultDto>> Handle(SearchTripsQuery request, CancellationToken cancellationToken)
+    {
+        var cacheKey = BuildCacheKey(request);
+
+        var cached = await _cache.GetAsync<PagedResult<TripSearchResultDto>>(cacheKey, cancellationToken);
+        if (cached is not null)
+            return cached;
+
+        var result = await QueryDatabaseAsync(request, cancellationToken);
+
+        await _cache.SetAsync(cacheKey, result, CacheTtl, cancellationToken);
+
+        return result;
+    }
+
+    private static string BuildCacheKey(SearchTripsQuery request) =>
+        $"trips:search:{request.OriginCity.ToLowerInvariant()}:{request.DestinationCity.ToLowerInvariant()}:{request.DepartureDate:yyyy-MM-dd}:{request.Page}:{request.PageSize}";
+
+    private async Task<PagedResult<TripSearchResultDto>> QueryDatabaseAsync(SearchTripsQuery request, CancellationToken cancellationToken)
     {
         var dayStart = new DateTimeOffset(request.DepartureDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         var dayEnd = dayStart.AddDays(1);

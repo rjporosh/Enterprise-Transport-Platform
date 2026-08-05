@@ -9,4 +9,4 @@ public sealed record SearchTripsQuery(
     string DestinationCity,
     DateOnly DepartureDate,
     int Page = 1,
-    int PageSize = 20) : IRequest<PagedResult<TripSearchResultDto>>;
+    int PageSize = 10) : IRequest<PagedResult<TripSearchResultDto>>;

@@ -3,26 +3,82 @@ using BookingService.Api.Endpoints;
 using BookingService.Api.Middleware;
 using BookingService.Application;
 using BookingService.Infrastructure;
+using BookingService.Infrastructure.Observability;
 using BookingService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Scalar.AspNetCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+const string ServiceName = "booking-service";
 
-// --- Logging -----------------------------------------------------------
-builder.Host.UseSerilog((context, services, configuration) => configuration
-    .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Service", "booking-service")
-    .WriteTo.Console());
+// --- Logging ---------------------------------------------------------------
+// Console (always) + Seq (structured, queryable log store — see infrastructure/docker).
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Service", ServiceName)
+        .WriteTo.Console();
 
-// --- Application services ------------------------------------------------
+    var seqUrl = context.Configuration["Seq:ServerUrl"];
+    if (!string.IsNullOrWhiteSpace(seqUrl))
+        configuration.WriteTo.Seq(seqUrl);
+});
+
+// --- Application services ---------------------------------------------------
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// --- AuthN/AuthZ ---------------------------------------------------------
+// --- Observability: OpenTelemetry traces + metrics --------------------------
+// Traces export over OTLP to Jaeger. Metrics are scraped by Prometheus from
+// /metrics and visualized in Grafana (see infrastructure/monitoring and
+// docs/OBSERVABILITY_GUIDE.md for exact queries to run against each tool).
+//
+// IMPORTANT: this block only touches TracerProviderBuilder/MeterProviderBuilder
+// extension methods (Add***Instrumentation / AddOtlpExporter / AddPrometheusExporter).
+// Health checks (AddNpgSql/AddRabbitMQ/AddRedis) belong ONLY in the
+// AddHealthChecks() block further down — mixing them in here previously
+// caused the "builds but won't start" bug reported after the .NET 10 upgrade,
+// since those are IHealthChecksBuilder extensions, not tracing/metrics ones.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(
+        serviceName: ServiceName,
+        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.1.0"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation(options => options.RecordException = true)
+            .AddHttpClientInstrumentation()
+            .AddNpgsql();
+
+        // Parameterless overload resolves IConnectionMultiplexer from DI at
+        // startup (OpenTelemetry.Instrumentation.StackExchangeRedis). If your
+        // installed package version only exposes the instance-based
+        // AddRedisInstrumentation(IConnectionMultiplexer) overload, resolve it
+        // via a temporary provider instead:
+        //   using var sp = builder.Services.BuildServiceProvider();
+        //   tracing.AddRedisInstrumentation(sp.GetRequiredService<IConnectionMultiplexer>());
+        tracing.AddRedisInstrumentation();
+
+        var otlpEndpoint = builder.Configuration["OpenTelemetry:OtlpEndpoint"];
+        if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+            tracing.AddOtlpExporter(otlp => otlp.Endpoint = new Uri(otlpEndpoint));
+    })
+    .WithMetrics(metrics => metrics
+        .AddMeter(BookingMetrics.MeterName)
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
+
+// --- AuthN/AuthZ -------------------------------------------------------------
 // Booking Service trusts JWTs already validated by the API Gateway (Ocelot),
 // but validates them again here defense-in-depth — a service should never
 // assume its only caller is the gateway.
@@ -43,17 +99,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-// --- API surface -----------------------------------------------------------
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-    {
-        Title = "Bus Ticketing — Booking Service",
-        Version = "v1",
-        Description = "Owns trip search, seat holds, booking lifecycle and the booking outbox."
-    });
-});
+// --- API documentation: native OpenAPI + Scalar only -------------------------
+// Swashbuckle/Swagger is deliberately NOT used here: on .NET 10, Swashbuckle
+// (still built against the OpenAPI.NET v1 object model) and the framework's
+// own Microsoft.AspNetCore.OpenApi (now on OpenAPI.NET v2) disagree on the
+// shape of OpenApiDocument/OpenApiSchema — trying to register both throws at
+// startup, which is almost certainly the "builds fine, crashes on run" you
+// hit. Scalar renders the native /openapi/v1.json document directly, so it
+// doesn't need Swashbuckle at all. If you specifically need swagger.json for
+// an external tool, generate it via `dotnet build` + the
+// Microsoft.Extensions.ApiDescription.Server tooling instead of adding
+// Swashbuckle back in.
+builder.Services.AddOpenApi("v1");
 
 builder.Services.AddCors(options =>
 {
@@ -64,9 +121,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+// --- Health checks (surfaced at /health; each dependency also feeds Grafana via its own exporter) ---
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("BookingDb") ?? string.Empty, name: "postgres")
-    .AddRabbitMQ(name: "rabbitmq");
+    .AddRabbitMQ(name: "rabbitmq")
+    .AddRedis(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379", name: "redis");
 
 var app = builder.Build();
 
@@ -75,11 +134,12 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
+app.MapOpenApi();                          // -> /openapi/v1.json
+app.MapScalarApiReference("/scalar", options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    options.WithTitle("Bus Ticketing — Booking Service");
+    options.WithTheme(ScalarTheme.Purple);
+});
 
 app.UseCors("AllowConfiguredOrigins");
 app.UseAuthentication();
@@ -88,11 +148,14 @@ app.UseAuthorization();
 app.MapTripsEndpoints();
 app.MapBookingsEndpoints();
 app.MapHealthChecks("/health");
+app.MapPrometheusScrapingEndpoint("/metrics");
 
 // Applies pending EF Core migrations on startup in dev/demo environments.
-// In production this is a deliberate no-op — migrations are applied via the
-// CI/CD pipeline's dedicated migration step, never by an app instance racing
-// other replicas on boot.
+// REQUIRES migrations to already exist (dotnet ef migrations add InitialCreate)
+// — see docs/RUNBOOK.md step 1. If no migration files exist yet, this call
+// silently does nothing and every request will fail with "relation does not
+// exist", which is the other very likely cause of "builds fine, doesn't
+// actually work end-to-end".
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();

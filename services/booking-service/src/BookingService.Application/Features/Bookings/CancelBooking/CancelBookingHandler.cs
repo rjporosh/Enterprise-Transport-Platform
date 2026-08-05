@@ -15,12 +15,21 @@ public sealed class CancelBookingHandler : IRequestHandler<CancelBookingCommand>
     private readonly IBookingDbContext _context;
     private readonly IEventPublisher _eventPublisher;
     private readonly IDateTimeProvider _clock;
+    private readonly ICacheService _cache;
+    private readonly IBookingMetrics _metrics;
 
-    public CancelBookingHandler(IBookingDbContext context, IEventPublisher eventPublisher, IDateTimeProvider clock)
+    public CancelBookingHandler(
+        IBookingDbContext context,
+        IEventPublisher eventPublisher,
+        IDateTimeProvider clock,
+        ICacheService cache,
+        IBookingMetrics metrics)
     {
         _context = context;
         _eventPublisher = eventPublisher;
         _clock = clock;
+        _cache = cache;
+        _metrics = metrics;
     }
 
     public async Task Handle(CancelBookingCommand request, CancellationToken cancellationToken)
@@ -51,5 +60,10 @@ public sealed class CancelBookingHandler : IRequestHandler<CancelBookingCommand>
 
         await _context.SaveChangesAsync(cancellationToken);
         booking.ClearDomainEvents();
+
+        // Seats just came back on the market — evict cached search results
+        // rather than showing "sold out" for up to 30 more seconds.
+        await _cache.RemoveByPrefixAsync("trips:search:", cancellationToken);
+        _metrics.RecordBookingCancelled();
     }
 }
