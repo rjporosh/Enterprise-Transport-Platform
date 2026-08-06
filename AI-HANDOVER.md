@@ -1,0 +1,1 @@
+PUT WHAT IS DONE WHAT IS LEFT so other ai can work from there
