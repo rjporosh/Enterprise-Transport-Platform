@@ -23,10 +23,16 @@ public static class RuntimeErrorLogWriter
         var logsDirectory = Path.GetFullPath(Path.Combine(contentRootPath, relativeLogsDirectory));
         Directory.CreateDirectory(logsDirectory);
 
-        var fileName = $"runtime-error-{DateTime.UtcNow:dd-MM-yyyy-HH-mm-ss}.txt";
+        // One file per day, appended — not one file per crash. If the
+        // service crash-loops (e.g. a bad connection string that never
+        // gets fixed), everything for that day lands in the same file in
+        // chronological order instead of flooding logs/ with near-identical
+        // one-off files.
+        var fileName = $"runtime-error-{DateTime.UtcNow:dd-MM-yyyy}.txt";
         var path = Path.Combine(logsDirectory, fileName);
 
         var content = new StringBuilder();
+        content.AppendLine(new string('-', 72));
         content.AppendLine("RUNTIME ERROR — service crashed or failed to start");
         content.AppendLine($"Timestamp:   {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss.fff} (UTC)");
         content.AppendLine($"Content root: {contentRootPath}");
@@ -57,7 +63,7 @@ public static class RuntimeErrorLogWriter
 
         try
         {
-            File.WriteAllText(path, content.ToString());
+            File.AppendAllText(path, content.ToString());
         }
         catch
         {

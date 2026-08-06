@@ -15,3 +15,8 @@
 # Tests
 coverage/
 TestResults/
+
+# Build/run/query diagnostic logs — see scripts/README.md. Kept locally,
+# not committed: timestamped, disposable, would pile up in every
+# contributor's history.
+logs/
