@@ -15,15 +15,17 @@ stubs. See "What's built" below for exactly what that covers.
 
 | Layer | Location | Status |
 |---|---|---|
+| Auth Service (backend) | `services/auth-service` | Implemented: register/login/refresh (rotation + theft detection)/logout, account lockout, audit trail, DB-provider-switchable EF Core, transactional outbox → RabbitMQ, unit + integration tests |
 | Booking Service (backend) | `services/booking-service` | Implemented: search trips, create/cancel booking, seat-hold concurrency, transactional outbox → RabbitMQ, unit + integration tests |
+| Bus Service (backend) | `services/bus-service` | Implemented: fleet/depot management, bus lifecycle (Active/UnderMaintenance/Retired), DB-provider-switchable EF Core, transactional outbox → RabbitMQ, file-based build/runtime/query diagnostic logging (see `scripts/README.md`), unit + integration tests |
 | Customer web app | `apps/angular-client/bus-ticketing-customer-web` | Implemented: search → seat selection → booking confirmation flow (Angular 22, standalone components, signals) |
 | Admin console | `apps/react-admin/bus-ticketing-admin` | Implemented: bookings list + detail, cancel-booking action (React 19, TanStack Query) |
 | Local orchestration | `infrastructure/docker/docker-compose.yml` | Implemented: Postgres, RabbitMQ, and all three apps wired together |
 
-Everything else under `services/`, `apps/`, `shared/`, and `infrastructure/`
-that isn't listed above is still the scaffold from the original plan — empty
-folders reserving a place in the architecture, not yet built. Building
-those next, one real slice at a time, is what `ROADMAP.md` sequences.
+Still to build: Route Service, Payment Service, Notification Service —
+being worked one at a time, each as its own zip delivery with its own
+commit history, following the same conventions established across the
+three services above.
 
 ## A note on how this was built
 
