@@ -1,0 +1,51 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35222.181
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.Domain", "src\BusService.Domain\BusService.Domain.csproj", "{8239243E-AEFB-4865-BFD7-412E99B3548A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.Application", "src\BusService.Application\BusService.Application.csproj", "{6294E3C0-009B-48B3-BD87-DDC395FDC117}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.Infrastructure", "src\BusService.Infrastructure\BusService.Infrastructure.csproj", "{11CBDC3B-81B6-484A-BE57-788CD588640E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.Api", "src\BusService.Api\BusService.Api.csproj", "{1F65B2F0-0F49-4C3A-9DE6-BF0997B39651}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.UnitTests", "tests\BusService.UnitTests\BusService.UnitTests.csproj", "{7CEEB44E-E1FF-4DE1-9350-9949FA48F169}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusService.IntegrationTests", "tests\BusService.IntegrationTests\BusService.IntegrationTests.csproj", "{3E1F5738-73F1-4BFF-B9AE-E6D17898ECB6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8239243E-AEFB-4865-BFD7-412E99B3548A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8239243E-AEFB-4865-BFD7-412E99B3548A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8239243E-AEFB-4865-BFD7-412E99B3548A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8239243E-AEFB-4865-BFD7-412E99B3548A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6294E3C0-009B-48B3-BD87-DDC395FDC117}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6294E3C0-009B-48B3-BD87-DDC395FDC117}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6294E3C0-009B-48B3-BD87-DDC395FDC117}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6294E3C0-009B-48B3-BD87-DDC395FDC117}.Release|Any CPU.Build.0 = Release|Any CPU
+		{11CBDC3B-81B6-484A-BE57-788CD588640E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11CBDC3B-81B6-484A-BE57-788CD588640E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11CBDC3B-81B6-484A-BE57-788CD588640E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11CBDC3B-81B6-484A-BE57-788CD588640E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F65B2F0-0F49-4C3A-9DE6-BF0997B39651}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F65B2F0-0F49-4C3A-9DE6-BF0997B39651}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F65B2F0-0F49-4C3A-9DE6-BF0997B39651}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F65B2F0-0F49-4C3A-9DE6-BF0997B39651}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7CEEB44E-E1FF-4DE1-9350-9949FA48F169}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7CEEB44E-E1FF-4DE1-9350-9949FA48F169}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7CEEB44E-E1FF-4DE1-9350-9949FA48F169}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7CEEB44E-E1FF-4DE1-9350-9949FA48F169}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E1F5738-73F1-4BFF-B9AE-E6D17898ECB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E1F5738-73F1-4BFF-B9AE-E6D17898ECB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E1F5738-73F1-4BFF-B9AE-E6D17898ECB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E1F5738-73F1-4BFF-B9AE-E6D17898ECB6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
