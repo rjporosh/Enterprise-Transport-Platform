@@ -15,3 +15,8 @@
 # Tests
 coverage/
 TestResults/
+
+# Notification Service — never commit real secrets or generated logs
+**/logs/
+**/*firebase*service-account*.json
+**/*serviceAccountKey*.json

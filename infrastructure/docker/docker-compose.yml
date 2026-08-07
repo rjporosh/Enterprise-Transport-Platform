@@ -86,5 +86,71 @@ services:
     ports:
       - "5173:80"
 
+  # --- Notification Service ---
+  # Added alongside the existing services above without modifying any of
+  # them. Uses its own Postgres container (postgres-notification) rather
+  # than adding a second database to the shared `postgres` container above
+  # — the official postgres image has no built-in multi-database
+  # provisioning without a custom init script, and a second container is
+  # zero-risk to the already-working booking-service setup. Same
+  # "not run/verified, reviewed by hand" caveat as the rest of this file —
+  # see the top-of-file note — applies to everything below.
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-notification
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notification_service
+      POSTGRES_USER: notification_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_svc -d notification_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # SMTP catcher for local dev — every email Notification Service sends
+  # lands here instead of a real inbox. Web UI at http://localhost:8025.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: bus-ticketing-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+  notification-service:
+    build:
+      context: ../../services/notification-service
+      dockerfile: src/NotificationService.Api/Dockerfile
+    container_name: bus-ticketing-notification-service
+    restart: unless-stopped
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__NotificationDb: "Host=postgres-notification;Port=5432;Database=notification_service;Username=notification_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Smtp__Host: mailhog
+      Smtp__Port: "1025"
+      Smtp__UseStartTls: "false"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+    ports:
+      - "8081:8080"
+
 volumes:
   postgres-data:
+  postgres-notification-data:
