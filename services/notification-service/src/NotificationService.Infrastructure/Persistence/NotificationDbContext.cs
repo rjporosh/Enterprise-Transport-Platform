@@ -19,6 +19,8 @@ public sealed class NotificationDbContext : DbContext, INotificationDbContext
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationDbContext).Assembly);
 
+        modelBuilder.Ignore<NotificationService.Domain.Common.DomainEvent>();
+
         // Soft-delete convention (CLAUDE.md, "Soft Delete"): every query
         // against a soft-deletable aggregate is filtered by default. Handlers
         // that need deleted rows (none currently do) call

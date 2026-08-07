@@ -68,9 +68,9 @@ public sealed class NotificationGrpcServiceImpl : NotificationGrpcService.Notifi
 
     private static NotificationChannel ToDomainChannel(GrpcChannel channel) => channel switch
     {
-        GrpcChannel.GrpcChannelEmail => NotificationChannel.Email,
-        GrpcChannel.GrpcChannelSms => NotificationChannel.Sms,
-        GrpcChannel.GrpcChannelPush => NotificationChannel.Push,
+        GrpcChannel.Email => NotificationChannel.Email,
+        GrpcChannel.Sms => NotificationChannel.Sms,
+        GrpcChannel.Push => NotificationChannel.Push,
         _ => throw new RpcException(new Status(StatusCode.InvalidArgument, "channel must be specified."))
     };
 }

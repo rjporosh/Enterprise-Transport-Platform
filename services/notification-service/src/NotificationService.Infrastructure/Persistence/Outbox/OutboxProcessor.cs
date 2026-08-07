@@ -76,7 +76,7 @@ public sealed class OutboxProcessor : BackgroundService
     /// <summary>"NotificationService.Domain.Events.NotificationSentDomainEvent, ..." -&gt; "notification.sent"</summary>
     private static string ToRoutingKey(string assemblyQualifiedEventType)
     {
-        var shortName = assemblyQualifiedEventType.Split(,)[0].Split('.').Last();
+        var shortName = assemblyQualifiedEventType.Split(',')[0].Split('.').Last();
         var withoutSuffix = shortName.Replace("DomainEvent", string.Empty);
         return "notification." + string.Concat(withoutSuffix.Select((c, i) =>
             i > 0 && char.IsUpper(c) ? "." + char.ToLower(c) : char.ToLower(c).ToString()));

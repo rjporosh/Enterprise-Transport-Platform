@@ -40,14 +40,14 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 
-    <!-- Email: MailKit -- actively maintained, RFC-correct SMTP client (System.Net.Mail is legacy/unsupported for new code). -->
+    <!-- Email: MailKit — actively maintained, RFC-correct SMTP client (System.Net.Mail is legacy/unsupported for new code). -->
     <PackageReference Include="MailKit" Version="4.8.0" />
 
     <!-- Retry/backoff for channel sends (CLAUDE.md, "Retry Policies"). -->
     <PackageReference Include="Polly" Version="8.5.0" />
     <PackageReference Include="Polly.Extensions" Version="8.5.0" />
 
-    <!-- Server-side template rendering (CLAUDE.md, "Templates"): {{variable}} substitution, loops/conditionals for richer templates later. Sandboxed by default -- no file/network/reflection access from template source. -->
+    <!-- Server-side template rendering (CLAUDE.md, "Templates"): {{variable}} substitution, loops/conditionals for richer templates later. Sandboxed by default — no file/network/reflection access from template source. -->
     <PackageReference Include="Scriban" Version="5.12.0" />
 
     <!-- Scheduling (CLAUDE.md, "Quartz.NET Jobs" / "Scheduling"). -->
