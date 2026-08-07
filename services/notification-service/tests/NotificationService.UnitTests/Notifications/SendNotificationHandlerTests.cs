@@ -1,0 +1,140 @@
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using NotificationService.Application.Features.Notifications.SendNotification;
+using NotificationService.Domain.Entities;
+using NotificationService.Domain.Enums;
+using NotificationService.UnitTests.TestSupport;
+using Xunit;
+
+namespace NotificationService.UnitTests.Notifications;
+
+public class SendNotificationHandlerTests : IDisposable
+{
+    private readonly TestNotificationDbContext _context;
+    private readonly FakeEventPublisher _eventPublisher = new();
+    private readonly FakeDateTimeProvider _clock = new();
+    private readonly FakeTemplateRenderer _templateRenderer = new();
+
+    public SendNotificationHandlerTests()
+    {
+        var options = new DbContextOptionsBuilder<TestNotificationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        _context = new TestNotificationDbContext(options);
+    }
+
+    private SendNotificationHandler CreateHandler() => new(_context, _eventPublisher, _clock, _templateRenderer);
+
+    private static SendNotificationCommand BasicCommand(
+        string? templateKey = null, IReadOnlyDictionary<string, object?>? variables = null,
+        string? body = "Hello there", string? recipientId = null, bool isTransactional = true,
+        DateTimeOffset? scheduledForUtc = null) =>
+        new(
+            Recipient: "jane@example.com",
+            Channel: NotificationChannel.Email,
+            TemplateKey: templateKey,
+            TemplateVariables: variables,
+            Subject: templateKey is null ? "Subject" : null,
+            Body: templateKey is null ? body : null,
+            DataPayload: null,
+            RecipientId: recipientId,
+            SourceReference: null,
+            Locale: null,
+            Priority: NotificationPriority.Normal,
+            ScheduledForUtc: scheduledForUtc,
+            MaxRetryCount: null,
+            IsTransactional: isTransactional);
+
+    [Fact]
+    public async Task Handle_WithExplicitBody_CreatesPendingNotification_AndPublishesCreatedEvent()
+    {
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(BasicCommand(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Status.Should().Be(NotificationStatus.Pending);
+        (await _context.Notifications.CountAsync()).Should().Be(1);
+        _eventPublisher.PublishedEvents.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Handle_WithFutureScheduledForUtc_CreatesScheduledNotification()
+    {
+        var handler = CreateHandler();
+        _clock.UtcNow = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var scheduledFor = _clock.UtcNow.AddDays(1);
+
+        var result = await handler.Handle(BasicCommand(scheduledForUtc: scheduledFor), CancellationToken.None);
+
+        result.Value!.Status.Should().Be(NotificationStatus.Scheduled);
+        result.Value.ScheduledForUtc.Should().Be(scheduledFor);
+    }
+
+    [Fact]
+    public async Task Handle_WithTemplateKey_RendersSubjectAndBody_FromMatchingActiveTemplate()
+    {
+        var template = NotificationTemplate.Create(
+            "booking.confirmed", TemplateChannel.Email, "en", "Booking confirmed",
+            null, "Booking {{bookingId}} confirmed", "Hi {{firstName}}, your booking {{bookingId}} is confirmed.",
+            null, _clock.UtcNow);
+        _context.NotificationTemplates.Add(template);
+        await _context.SaveChangesAsync();
+
+        var handler = CreateHandler();
+        var variables = new Dictionary<string, object?> { ["firstName"] = "Jane", ["bookingId"] = "B-1" };
+
+        var result = await handler.Handle(BasicCommand(templateKey: "booking.confirmed", variables: variables), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var saved = await _context.Notifications.FirstAsync();
+        saved.Subject.Should().Be("Booking B-1 confirmed");
+        saved.Body.Should().Be("Hi Jane, your booking B-1 is confirmed.");
+        saved.TemplateId.Should().Be(template.Id);
+    }
+
+    [Fact]
+    public async Task Handle_WithUnknownTemplateKey_ReturnsNotFoundError()
+    {
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(BasicCommand(templateKey: "does.not.exist"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Handle_NonTransactional_ForOptedOutRecipient_ReturnsConflictError_AndDoesNotCreateNotification()
+    {
+        var preference = RecipientPreference.CreateDefault("user-1", "en", _clock.UtcNow);
+        preference.UpdatePreferences(emailOptOut: true, smsOptOut: false, pushOptOut: false, "en", _clock.UtcNow);
+        _context.RecipientPreferences.Add(preference);
+        await _context.SaveChangesAsync();
+
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(BasicCommand(recipientId: "user-1", isTransactional: false), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Code == "CONFLICT");
+        (await _context.Notifications.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_Transactional_ForOptedOutRecipient_StillSends()
+    {
+        var preference = RecipientPreference.CreateDefault("user-1", "en", _clock.UtcNow);
+        preference.UpdatePreferences(emailOptOut: true, smsOptOut: false, pushOptOut: false, "en", _clock.UtcNow);
+        _context.RecipientPreferences.Add(preference);
+        await _context.SaveChangesAsync();
+
+        var handler = CreateHandler();
+
+        var result = await handler.Handle(BasicCommand(recipientId: "user-1", isTransactional: true), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    public void Dispose() => _context.Dispose();
+}
