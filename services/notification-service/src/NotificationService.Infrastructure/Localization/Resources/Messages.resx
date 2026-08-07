@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="notification.not_found" xml:space="preserve"><value>Notification '{0}' was not found.</value></data>
+  <data name="template.not_found" xml:space="preserve"><value>No active template '{0}' found for the requested channel and locale.</value></data>
+  <data name="template.already_exists" xml:space="preserve"><value>A template with this key, channel and locale already exists.</value></data>
+  <data name="notification.recipient_opted_out" xml:space="preserve"><value>Recipient has opted out of this notification channel.</value></data>
+  <data name="notification.invalid_state" xml:space="preserve"><value>This operation is not valid for the notification's current status.</value></data>
+  <data name="validation.recipient_required" xml:space="preserve"><value>Recipient is required.</value></data>
+  <data name="validation.body_or_template_required" xml:space="preserve"><value>Either a template key or a message body must be supplied.</value></data>
+  <data name="error.unexpected" xml:space="preserve"><value>An unexpected error occurred. Please try again or contact support if the problem persists.</value></data>
+</root>

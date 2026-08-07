@@ -1,0 +1,4 @@
+This folder is where `dotnet ef migrations add InitialCreate` output goes.
+No migration is committed yet — this sandbox has no .NET SDK / dotnet-ef
+tool available to generate one. See services/notification-service/README.md,
+"Running locally", for the exact command to run before first use.
