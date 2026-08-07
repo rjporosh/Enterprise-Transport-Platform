@@ -70,14 +70,11 @@ try
     builder.Services.AddAuthorization();
 
     // ---------- OpenAPI / Scalar ----------
-    // Native Microsoft.AspNetCore.OpenApi + Scalar only — not Swashbuckle.
-    // See Auth/Booking Service's Program.cs for the full story: Swashbuckle
-    // and the framework's own OpenAPI.NET v2-based generator disagree on the
-    // OpenApiDocument/OpenApiSchema shape on .NET 10, and Scalar's default
-    // document route (/openapi/{documentName}.json) is the NATIVE
-    // generator's route, not Swashbuckle's — running Swashbuckle here would
-    // reproduce the same "Scalar loads but shows nothing" bug fixed
-    // elsewhere in this platform.
+    // Native minimal-API OpenAPI document generation + Scalar only — not Swashbuckle.
+    // Swashbuckle and the framework's own OpenAPI.NET v2-based generator disagree on
+    // the OpenApiDocument/OpenApiSchema shape on .NET 10, and Scalar's default
+    // document route is the native generator's route — running Swashbuckle here would
+    // reproduce the "Scalar loads but shows nothing" bug fixed elsewhere.
     builder.Services.AddOpenApi("v1", options =>
     {
         options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -86,11 +83,11 @@ try
             document.Info.Version = "v1";
             document.Info.Description = "Fleet management — the canonical source of truth for buses and depots across the Enterprise Transport Platform.";
 
-            document.Components ??= new Microsoft.OpenApi.Models.OpenApiComponents();
-            document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.Models.IOpenApiSecurityScheme>();
-            document.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
+            document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
+            document.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.OpenApiSecurityScheme
             {
-                Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+                Type = Microsoft.OpenApi.SecuritySchemeType.Http,
                 Scheme = "bearer",
                 BearerFormat = "JWT",
                 Description = "Paste an access token issued by Auth Service's /api/v1/auth/login."
