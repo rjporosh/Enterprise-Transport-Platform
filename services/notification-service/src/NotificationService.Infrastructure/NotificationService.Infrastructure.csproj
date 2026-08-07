@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>NotificationService.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!--
+      Database portability (CLAUDE.md, "Database Provider Abstraction").
+      Same pattern already established in AuthService.Infrastructure.csproj:
+      all wired providers are always referenced; which one is instantiated is
+      a runtime switch on "Database:Provider" (Postgres | SqlServer | MySql) —
+      see DependencyInjection.cs. Oracle and MongoDB are deliberately NOT
+      wired for the same reasons already documented there (Oracle.EntityFrameworkCore.Core
+      is dual-licensed/commercial and unverifiable offline; MongoDB is a
+      document store, not a relational EF Core provider — supporting it would
+      mean a second, parallel persistence implementation behind
+      INotificationDbContext, not a one-line provider switch, which is a
+      genuine architecture decision this task's own rules flag for approval
+      rather than silent implementation. See docs/architecture/notification-service-architecture.md,
+      "Database portability" for the extension point.
+    -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" NoWarn="NU1608" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+
+    <!-- Email: MailKit -- actively maintained, RFC-correct SMTP client (System.Net.Mail is legacy/unsupported for new code). -->
+    <PackageReference Include="MailKit" Version="4.8.0" />
+
+    <!-- Retry/backoff for channel sends (CLAUDE.md, "Retry Policies"). -->
+    <PackageReference Include="Polly" Version="8.5.0" />
+    <PackageReference Include="Polly.Extensions" Version="8.5.0" />
+
+    <!-- Server-side template rendering (CLAUDE.md, "Templates"): {{variable}} substitution, loops/conditionals for richer templates later. Sandboxed by default -- no file/network/reflection access from template source. -->
+    <PackageReference Include="Scriban" Version="5.12.0" />
+
+    <!-- Scheduling (CLAUDE.md, "Quartz.NET Jobs" / "Scheduling"). -->
+    <PackageReference Include="Quartz" Version="3.13.1" />
+    <PackageReference Include="Quartz.Extensions.Hosting" Version="3.13.1" />
+
+    <!-- FCM HTTP v1 push requires a Google OAuth2 access token minted from a service-account JSON key. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NotificationService.Application\NotificationService.Application.csproj" />
+  </ItemGroup>
+
+</Project>

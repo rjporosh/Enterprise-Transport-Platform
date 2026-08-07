@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="notification.not_found" xml:space="preserve"><value>বিজ্ঞপ্তি '{0}' পাওয়া যায়নি।</value></data>
+  <data name="template.not_found" xml:space="preserve"><value>অনুরোধকৃত চ্যানেল এবং ভাষার জন্য কোনো সক্রিয় টেমপ্লেট '{0}' পাওয়া যায়নি।</value></data>
+  <data name="template.already_exists" xml:space="preserve"><value>এই কী, চ্যানেল এবং ভাষা সহ একটি টেমপ্লেট ইতিমধ্যে বিদ্যমান।</value></data>
+  <data name="notification.recipient_opted_out" xml:space="preserve"><value>প্রাপক এই বিজ্ঞপ্তি চ্যানেল থেকে অপ্ট-আউট করেছেন।</value></data>
+  <data name="notification.invalid_state" xml:space="preserve"><value>বিজ্ঞপ্তির বর্তমান অবস্থার জন্য এই কার্যক্রমটি বৈধ নয়।</value></data>
+  <data name="validation.recipient_required" xml:space="preserve"><value>প্রাপক আবশ্যক।</value></data>
+  <data name="validation.body_or_template_required" xml:space="preserve"><value>একটি টেমপ্লেট কী অথবা বার্তার মূল অংশ সরবরাহ করতে হবে।</value></data>
+  <data name="error.unexpected" xml:space="preserve"><value>একটি অপ্রত্যাশিত ত্রুটি ঘটেছে। অনুগ্রহ করে আবার চেষ্টা করুন অথবা সমস্যা অব্যাহত থাকলে সহায়তার সাথে যোগাযোগ করুন।</value></data>
+</root>
