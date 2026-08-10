@@ -22,16 +22,13 @@ public sealed class BusConfiguration : IEntityTypeConfiguration<Bus>
         builder.HasIndex(x => x.OperatorId);
         builder.HasIndex(x => x.DepotId);
         builder.HasIndex(x => x.Status);
+        builder.HasIndex(x => x.TenantId);
+        builder.HasIndex(x => x.CompanyId);
+        builder.HasIndex(x => x.OrganizationId);
+        builder.HasIndex(x => new { x.TenantId, x.IsDeleted });
 
-        // See docs/architecture/bus-service-architecture.md, "Database
-        // portability" — same trade-off as Auth Service's User aggregate.
         builder.Ignore(x => x.Version);
         builder.Ignore(x => x.DomainEvents);
-
-        // No FK to Depot: Depot rows can be reassigned/retired independently
-        // and a bus pointing at a depot that was since removed should still
-        // be readable (DepotId becomes a "last known depot" pointer, not a
-        // hard referential constraint) — RegisterBus/UpdateBusDetails
-        // validate the depot exists at write time instead.
+        builder.Property(x => x.Version).IsConcurrencyToken();
     }
 }

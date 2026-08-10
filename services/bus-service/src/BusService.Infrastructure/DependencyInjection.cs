@@ -1,6 +1,8 @@
 using BusService.Application.Common.Interfaces;
+using BusService.Infrastructure.Auditing;
 using BusService.Infrastructure.Caching;
 using BusService.Infrastructure.Common;
+using BusService.Infrastructure.Localization;
 using BusService.Infrastructure.Messaging;
 using BusService.Infrastructure.Observability;
 using BusService.Infrastructure.Observability.FileLogging;
@@ -29,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IBusDbContext>(sp => sp.GetRequiredService<BusDbContext>());
         services.AddScoped<IEventPublisher, OutboxEventPublisher>();
+        services.AddScoped<IAuditLogger, AuditLogger>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
 
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
@@ -46,6 +49,8 @@ public static class DependencyInjection
         });
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddSingleton<IBusMetrics, BusMetrics>();
+
+        services.AddSingleton<ILocalizationService, JsonLocalizationService>();
 
         return services;
     }

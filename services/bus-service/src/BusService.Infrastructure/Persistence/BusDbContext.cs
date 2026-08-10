@@ -13,6 +13,7 @@ public sealed class BusDbContext : DbContext, IBusDbContext
     public DbSet<Bus> Buses => Set<Bus>();
     public DbSet<Depot> Depots => Set<Depot>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

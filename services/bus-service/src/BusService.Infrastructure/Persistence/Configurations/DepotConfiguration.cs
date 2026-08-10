@@ -16,5 +16,9 @@ public sealed class DepotConfiguration : IEntityTypeConfiguration<Depot>
         builder.Property(x => x.Address).HasMaxLength(300);
 
         builder.HasIndex(x => x.City);
+        builder.HasIndex(x => x.TenantId);
+        builder.HasIndex(x => x.CompanyId);
+        builder.HasIndex(x => x.OrganizationId);
+        builder.HasIndex(x => new { x.TenantId, x.IsDeleted });
     }
 }
