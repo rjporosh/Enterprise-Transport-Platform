@@ -152,6 +152,12 @@ builder.Services.AddOpenTelemetry()
 // ---------- gRPC ----------
 builder.Services.AddGrpc();
 
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
+});
+
 var app = builder.Build();
 
 // ---------- Middleware pipeline ----------
@@ -182,6 +188,7 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.MapNotificationsEndpoints();
 app.MapTemplatesEndpoints();
 app.MapPreferencesEndpoints();
+app.MapReleaseEndpoints();
 app.MapGrpcService<NotificationGrpcServiceImpl>();
 
 app.MapHealthChecks("/health");

@@ -1,7 +1,10 @@
+using System;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Xunit;
@@ -43,13 +46,27 @@ public sealed class NotificationApiTests : IAsyncLifetime
     {
         await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync());
 
+        var rabbitConnectionString = _rabbitMq.GetConnectionString();
+        var rabbitUri = new Uri(rabbitConnectionString);
+        var rabbitUser = rabbitUri.UserInfo.Split(':')[0];
+        var rabbitPass = rabbitUri.UserInfo.Split(':')[1];
+        var rabbitHost = rabbitUri.Host;
+        var rabbitPort = rabbitUri.Port;
+
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ConnectionStrings:NotificationDb", _postgres.GetConnectionString());
-            builder.UseSetting("RabbitMq:HostName", _rabbitMq.Hostname);
-            builder.UseSetting("RabbitMq:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
+            builder.UseSetting("RabbitMq:HostName", rabbitHost);
+            builder.UseSetting("RabbitMq:Port", rabbitPort.ToString());
+            builder.UseSetting("RabbitMq:UserName", rabbitUser);
+            builder.UseSetting("RabbitMq:Password", rabbitPass);
             builder.UseSetting("Jwt:SigningKey", "integration-test-signing-key-32-chars-minimum");
+            builder.UseSetting("ASPNETCORE_ENVIRONMENT", "Development");
         });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationService.Infrastructure.Persistence.NotificationDbContext>();
+        await db.Database.MigrateAsync();
 
         _client = _factory.CreateClient();
     }
