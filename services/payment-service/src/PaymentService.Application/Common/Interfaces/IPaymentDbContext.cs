@@ -7,6 +7,7 @@ public interface IPaymentDbContext
 {
     DbSet<Payment> Payments { get; }
     DbSet<PaymentRefund> Refunds { get; }
+    DbSet<AgentPaymentMethod> AgentPaymentMethods { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

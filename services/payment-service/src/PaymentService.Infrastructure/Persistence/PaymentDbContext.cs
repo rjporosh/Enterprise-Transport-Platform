@@ -19,6 +19,7 @@ public class PaymentDbContext : DbContext, IPaymentDbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PaymentRefund> Refunds => Set<PaymentRefund>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AgentPaymentMethod> AgentPaymentMethods => Set<AgentPaymentMethod>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

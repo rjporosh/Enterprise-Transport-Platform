@@ -20,11 +20,13 @@ public class TestPaymentDbContext : IPaymentDbContext, IDisposable
         Payments = _context.Set<Payment>();
         Refunds = _context.Set<PaymentRefund>();
         OutboxMessages = _context.Set<OutboxMessage>();
+        AgentPaymentMethods = _context.Set<AgentPaymentMethod>();
     }
 
     public DbSet<Payment> Payments { get; }
     public DbSet<PaymentRefund> Refunds { get; }
     public DbSet<OutboxMessage> OutboxMessages { get; }
+    public DbSet<AgentPaymentMethod> AgentPaymentMethods { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
