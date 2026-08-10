@@ -163,7 +163,7 @@ try
 
     app.MapPrometheusScrapingEndpoint();
 
-    if (app.Environment.IsDevelopment())
+    if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();

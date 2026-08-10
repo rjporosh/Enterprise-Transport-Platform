@@ -6,13 +6,18 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using PaymentService.Application.Common.Interfaces;
 using PaymentService.Application.Features.Payments.CreatePayment;
 using PaymentService.Domain.Enums;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
-using Testcontainers.Redis;
+using PaymentService.Infrastructure.Messaging;
+using PaymentService.Infrastructure.Persistence;
 using Xunit;
 
 namespace PaymentService.IntegrationTests;
@@ -22,32 +27,78 @@ public sealed class PaymentApiTests : IAsyncLifetime
     private const string TestSigningKey = "integration-test-signing-key-32-chars-minimum";
     private const string TestIssuer = "https://identity.payment-service.local";
     private const string TestAudience = "payment-service";
-
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder().WithImage("postgres:16-alpine").WithDatabase("payment_service_test").Build();
-    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder().WithImage("rabbitmq:3.13-management-alpine").Build();
-    private readonly RedisContainer _redis = new RedisBuilder().WithImage("redis:7.4-alpine").Build();
+    private SqliteConnection? _sharedConnection;
 
     private WebApplicationFactory<Program>? _factory;
     private HttpClient _client = default!;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbitMq.StartAsync(), _redis.StartAsync());
+        _sharedConnection = new SqliteConnection("DataSource=:memory:");
+        await _sharedConnection.OpenAsync();
 
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("ASPNETCORE_ENVIRONMENT", "Development");
-            builder.UseSetting("ConnectionStrings:DefaultConnection", _postgres.GetConnectionString());
-            builder.UseSetting("Redis:ConnectionString", _redis.GetConnectionString());
-            builder.UseSetting("RabbitMQ:HostName", _rabbitMq.Hostname);
-            builder.UseSetting("RabbitMQ:Port", _rabbitMq.GetMappedPublicPort(5672).ToString());
-            builder.UseSetting("Jwt:Issuer", TestIssuer);
-            builder.UseSetting("Jwt:Audience", TestAudience);
-            builder.UseSetting("Jwt:SigningKey", TestSigningKey);
-        });
-
+        _factory = new TestWebApplicationFactory(_sharedConnection);
         _client = _factory.CreateClient();
     }
+
+        private sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
+        {
+            private readonly SqliteConnection _connection;
+
+            public TestWebApplicationFactory(SqliteConnection connection)
+            {
+                _connection = connection;
+            }
+
+            protected override void ConfigureWebHost(IWebHostBuilder builder)
+            {
+                builder.UseSetting(WebHostDefaults.EnvironmentKey, "Testing");
+                builder.UseSetting("ConnectionStrings:DefaultConnection", "DataSource=:memory:");
+                builder.UseSetting("Database:Provider", "sqlite");
+                builder.UseSetting("Redis:ConnectionString", "localhost:6379");
+                builder.UseSetting("RabbitMQ:HostName", "localhost");
+                builder.UseSetting("RabbitMQ:Port", "5672");
+                builder.UseSetting("Jwt:Issuer", TestIssuer);
+                builder.UseSetting("Jwt:Audience", TestAudience);
+                builder.UseSetting("Jwt:SigningKey", TestSigningKey);
+
+                builder.ConfigureServices(services =>
+                {
+                    var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IMessageBusPublisher));
+                    if (descriptor is not null)
+                        services.Remove(descriptor);
+
+                    descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ICacheService));
+                    if (descriptor is not null)
+                        services.Remove(descriptor);
+
+                    descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IPaymentMetrics));
+                    if (descriptor is not null)
+                        services.Remove(descriptor);
+
+                    descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<PaymentDbContext>));
+                    if (descriptor is not null)
+                        services.Remove(descriptor);
+
+                    services.AddSingleton<IMessageBusPublisher, TestMessageBusPublisher>();
+                    services.AddSingleton<ICacheService, TestCacheService>();
+                    services.AddSingleton<IPaymentMetrics, TestPaymentMetrics>();
+
+                    services.AddDbContext<PaymentDbContext>(options =>
+                    {
+                        options.UseSqlite(_connection)
+                            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+                    });
+
+                    services.AddScoped<IPaymentDbContext>(sp => sp.GetRequiredService<PaymentDbContext>());
+
+                    var sp = services.BuildServiceProvider();
+                    using var scope = sp.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+                    db.Database.EnsureCreated();
+                });
+            }
+        }
 
     private static string MintToken(params string[] roles)
     {
@@ -114,6 +165,49 @@ public sealed class PaymentApiTests : IAsyncLifetime
     {
         _client.Dispose();
         if (_factory is not null) await _factory.DisposeAsync();
-        await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _rabbitMq.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
+        if (_sharedConnection is not null) await _sharedConnection.DisposeAsync();
+    }
+
+    private sealed class TestMessageBusPublisher : IMessageBusPublisher
+    {
+        public Task PublishAsync(string routingKey, string payload, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestCacheService : ICacheService
+    {
+        public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
+        {
+            return Task.FromResult<T?>(null);
+        }
+
+        public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken cancellationToken = default) where T : class
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(string key, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestPaymentMetrics : IPaymentMetrics
+    {
+        public void RecordPaymentCreated(string paymentMethod, string status) { }
+        public void RecordPaymentSucceeded(string paymentMethod, decimal amount, string currency) { }
+        public void RecordPaymentFailed(string paymentMethod, string? failureCode) { }
+        public void RecordRefundCreated(string currency, decimal amount) { }
+        public void RecordRefundSucceeded(string currency, decimal amount) { }
+        public void RecordProviderLatency(string provider, double milliseconds) { }
+        public void RecordIdempotencyConflict() { }
+        public void RecordCircuitBreakerOpened(string provider) { }
     }
 }

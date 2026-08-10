@@ -68,6 +68,18 @@ public class DefaultPaymentProvider : IPaymentProvider
             ProviderReference: providerPaymentId));
     }
 
+    public Task<PaymentProviderResult> VerifyPaymentMethodAsync(string accountNumber, string? metadata = null, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Verifying account {AccountNumber} with default provider", accountNumber);
+        return Task.FromResult(new PaymentProviderResult(
+            PaymentProviderStatus.Succeeded,
+            ProviderReference: accountNumber,
+            RawResponse: new Dictionary<string, string>
+            {
+                ["message"] = "Default provider - verification skipped"
+            }));
+    }
+
     public bool VerifyWebhookSignature(string payload, string? signatureHeader, string? timestampHeader)
     {
         return true;

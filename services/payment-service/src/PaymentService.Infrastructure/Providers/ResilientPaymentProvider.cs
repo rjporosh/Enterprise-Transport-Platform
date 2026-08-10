@@ -71,6 +71,13 @@ public class ResilientPaymentProvider : IPaymentProvider
         return _inner.VerifyWebhookSignature(payload, signatureHeader, timestampHeader);
     }
 
+    public async Task<PaymentProviderResult> VerifyPaymentMethodAsync(string accountNumber, string? metadata = null, CancellationToken cancellationToken = default)
+    {
+        return await ExecuteWithResilienceAsync(
+            () => _inner.VerifyPaymentMethodAsync(accountNumber, metadata, cancellationToken),
+            "VerifyPaymentMethodAsync");
+    }
+
     private async Task<PaymentProviderResult> ExecuteWithResilienceAsync(
         Func<Task<PaymentProviderResult>> operation,
         string operationName)

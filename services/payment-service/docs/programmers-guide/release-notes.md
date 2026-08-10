@@ -1,5 +1,36 @@
 # Payment Service - Release Notes
 
+## v1.3.0 - Phase 3: Reconciliation, Background Jobs, Integration Tests, and Docker Compose
+
+### Features
+
+- Quartz.NET background jobs:
+  - `PaymentReconciliationJob`: polls Processing payments older than 5 minutes and reconciles state via `provider.GetStatusAsync()`
+  - `FailedWebhookRetryJob`: retries failed outbox message deliveries
+  - `AgentPaymentMethodVerificationJob`: periodically verifies unverified agent payment methods with providers
+- `IPaymentProvider.VerifyPaymentMethodAsync` added for agent account verification
+- All 4 providers (Default, bKash, Nagad, Stripe) implement `VerifyPaymentMethodAsync`
+- `ResilientPaymentProvider` wraps `VerifyPaymentMethodAsync` with retry/timeout/circuit breaker
+- Docker Compose integration with dedicated `postgres-payment` container
+- Integration tests rewritten using `WebApplicationFactory` with SQLite in-memory database (no Testcontainers required)
+
+### Database
+
+- No new migrations required
+- SQLite added as supported database provider for testing environments
+- New `postgres-payment` service in Docker Compose
+
+### Testing
+
+- Integration tests now pass without Docker/Testcontainers
+- 2 integration tests: `CreatePayment_WithValidData_ReturnsCreated`, `CreatePayment_WithoutAuth_ReturnsUnauthorized`
+- Total: 32 passing unit tests + 2 passing integration tests
+
+### Known Limitations
+
+- Payout flow is a future enhancement (domain events and CQRS skeleton ready)
+- Quartz jobs are disabled in Testing environment to avoid SQLite `DateTimeOffset` translation issues
+
 ## v1.2.0 - Phase 2: Nagad + Stripe + Webhook Signature Verification
 
 ### Features

@@ -210,7 +210,55 @@ services:
     ports:
       - "5201:8080"
 
+  # --- Payment Service ---
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-payment
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payment_service
+      POSTGRES_USER: payment_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_svc -d payment_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  payment-service:
+    build:
+      context: ../../services/payment-service
+      dockerfile: src/PaymentService.Api/Dockerfile
+    container_name: bus-ticketing-payment-service
+    restart: unless-stopped
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres-payment;Port=5432;Database=payment_service;Username=payment_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Redis__ConnectionString: "redis:6379"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+      Cors__AllowedOrigins__0: "http://localhost:4200"
+      Cors__AllowedOrigins__1: "http://localhost:5173"
+    ports:
+      - "5202:8080"
+
 volumes:
   postgres-data:
   postgres-notification-data:
   postgres-bus-data:
+  postgres-payment-data:
