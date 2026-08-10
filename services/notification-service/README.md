@@ -3,16 +3,7 @@
 Email/SMS/Push delivery, templates, retry/outbox, and event-driven
 notifications for the Enterprise Transport Platform. Built with .NET 10,
 Clean Architecture, and CQRS (MediatR) — see
-[`docs/architecture/notification-service-architecture.md`](../../docs/architecture/notification-service-architecture.md)
-for the full design rationale.
-
-> **Build status note**: this was built in a sandbox with no .NET SDK and no
-> network access — every file was hand-reviewed against this repo's own
-> established conventions (`AuthService`/`BookingService`, read directly, not
-> from memory), but **not compiled, not run, and not tested**. Run a clean
-> `dotnet build` and `dotnet test` before deploying. See "Known limitations"
-> below for the specific things most likely to need a fix once a compiler is
-> in the loop.
+[`docs/architecture.md`](./docs/architecture.md) for the full design rationale.
 
 ## What's here
 
@@ -23,7 +14,7 @@ for the full design rationale.
 | Infrastructure | `NotificationService.Infrastructure` | EF Core (Postgres/SqlServer/MySql switch), outbox + RabbitMQ (publish and an upstream-event consumer), SMTP (MailKit) / Twilio+GenericHttp SMS / FCM HTTP v1 push, Scriban templates, Polly retry, Quartz jobs, resx localization (en, bn) |
 | Api | `NotificationService.Api` | REST + gRPC endpoints, JWT bearer auth, rate limiting, native OpenAPI+Scalar, health checks, OpenTelemetry+Prometheus |
 | Tests | `NotificationService.UnitTests`, `NotificationService.IntegrationTests` | Handler/state-machine unit tests (EF InMemory), Testcontainers-based API tests |
-| Load tests | `tests/load/k6` | Send-throughput load test — see `tests/load/README.md` |
+| Load tests | `tests/load-test/` | k6, NBomber, JMeter — see `tests/load-test/README.md` |
 
 ## Endpoints
 
@@ -44,15 +35,6 @@ for the full design rationale.
 
 ## Running locally
 
-**No migration is committed yet** (see "Known limitations" — this sandbox
-has no `dotnet-ef` tool available). Generate one before first run:
-
-```bash
-dotnet tool install --global dotnet-ef   # one-time, if you don't have it
-cd services/notification-service/src/NotificationService.Infrastructure
-dotnet ef migrations add InitialCreate --startup-project ../NotificationService.Api --context NotificationDbContext
-```
-
 ```bash
 # 1. Start dependencies (from repo root)
 docker compose -f infrastructure/docker/docker-compose.yml up -d postgres rabbitmq mailhog
@@ -71,7 +53,19 @@ dotnet test tests/NotificationService.UnitTests
 dotnet test tests/NotificationService.IntegrationTests   # needs Docker (Testcontainers)
 ```
 
-See [`tests/load/README.md`](tests/load/README.md) for the k6 load test.
+See [`tests/load-test/README.md`](tests/load-test/README.md) for load tests.
+
+## Load Tests
+
+See [`tests/load-test/README.md`](tests/load-test/README.md) for k6, NBomber, and JMeter instructions.
+
+## Documentation
+
+- [`docs/architecture.md`](./docs/architecture.md) — design rationale
+- [`docs/db-schema.md`](./docs/db-schema.md) — database schema and indexes
+- [`docs/programmers-guide/`](./docs/programmers-guide/) — developer guides
+- [`docs/diagrams/c4/`](./docs/diagrams/c4/) — C4 architecture diagrams
+- [`docs/scripts/postman/`](./docs/scripts/postman/) — Postman collection
 
 ## Configuration
 
@@ -92,32 +86,16 @@ overridable via environment variables (`Smtp__Host`, `Sms__Provider`,
 
 ## Known limitations
 
-Being transparent about what this delivery does **not** include, rather than
-silently shipping something that looks more finished than it is:
-
-1. **Not compiled or tested.** No .NET SDK/network access in the sandbox
-   this was built in. Run `dotnet build`/`dotnet test` before trusting any
-   of it — see the note at the top of this file.
-2. **No EF Core migration committed.** `dotnet-ef` requires the SDK, which
-   wasn't available. Generate `InitialCreate` per "Running locally" above
-   before first run.
-3. **Booking/Payment-sourced notifications need an Auth Service endpoint
-   that doesn't exist yet** — `GET /api/v1/users/{id}/contact` (or
-   equivalent). See architecture doc §5 for the full explanation and why
-   this wasn't added silently.
-4. **Idempotency-Key cache is in-process memory**, not Redis-backed —
-   fine for a single instance, breaks across replicas. See
-   `Api/Middleware/IdempotencyMiddleware.cs`.
-5. **Oracle and MongoDB are not wired** as database providers — see
-   architecture doc §4 for why, and the extension point if needed.
-6. **JMeter/NBomber load-test scenarios were not ported**, only k6 — see
-   `tests/load/README.md`.
-7. **FCM push and Twilio/SMS integrations are real, complete client code**
-   but were obviously never exercised against live Firebase/Twilio
-   credentials in this sandbox (no network). Sanity-check against a real
-   sandbox/test account before production use.
+1. **Auth Service `GET /api/v1/users/{id}/contact` endpoint does not exist yet** — Booking/Payment event recipient resolution falls back to inline contact fields or acks-and-drops.
+2. **Idempotency-Key cache is in-memory** (ConcurrentDictionary) — fine for a single instance, breaks across replicas. Redis backing needed for production multi-instance.
+3. **Oracle and MongoDB database providers are not wired** — requires separate architecture decision.
+4. **FCM push and Twilio/SMS integrations are real, complete client code** but require real credentials to deliver.
+5. **Search uses `ToLower().Contains()`** instead of `EF.Functions.ILike` for cross-provider compatibility — no case-insensitive index on PostgreSQL.
 
 ## Further reading
 
-- [Architecture](../../docs/architecture/notification-service-architecture.md) — design rationale, the recipient-resolution gap, retry/outbox design
-- [Event catalog](../../docs/events/Event_Catalog.md) — events this service publishes and consumes
+- [Architecture](./docs/architecture.md) — design rationale, recipient-resolution gap, retry/outbox design
+- [Database Schema](./docs/db-schema.md) — entities, tables, indexes, constraints
+- [Programmer Guide](./docs/programmers-guide/) — CRUD, CQRS, validation, migrations, Quartz, testing
+- [Event Catalog](../../docs/events/Event_Catalog.md) — events this service publishes and consumes
+- [Postman Collection](./docs/scripts/postman/notification-service.postman-collection.json)

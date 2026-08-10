@@ -1,0 +1,194 @@
+{
+  "info": {
+    "name": "Notification Service API",
+    "description": "Email/SMS/Push delivery, templates, and recipient preferences for the Enterprise Transport Platform.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5301" },
+    { "key": "authToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Liveness/readiness check (Postgres, RabbitMQ)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Send Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/notifications",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"jane@example.com\",\n  \"channel\": \"Email\",\n  \"subject\": \"Welcome\",\n  \"body\": \"Hello Jane, welcome aboard.\",\n  \"priority\": \"Normal\",\n  \"isTransactional\": true\n}"
+            },
+            "description": "Send or schedule a notification. Returns 201 on success."
+          }
+        },
+        {
+          "name": "Get Notification by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}",
+            "description": "Retrieve a notification with its delivery-attempt log."
+          }
+        },
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/notifications?page=1&pageSize=20",
+            "description": "Paged, filterable, searchable notification history."
+          }
+        },
+        {
+          "name": "Cancel Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/cancel",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"reason\": \"No longer needed\" }"
+            },
+            "description": "Cancel a Pending/Scheduled/Retrying notification."
+          }
+        },
+        {
+          "name": "Retry Notification (Bearer)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/retry",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"additionalAttempts\": 3 }"
+            },
+            "description": "Manual retry for DeadLettered notifications. Requires Bearer token."
+          }
+        },
+        {
+          "name": "Soft-Delete Notification (Bearer)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/delete",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "description": "Soft-delete a notification. Requires Bearer token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Templates",
+      "item": [
+        {
+          "name": "Create Template (Bearer)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/templates",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"booking.confirmed\",\n  \"channel\": \"Email\",\n  \"locale\": \"en\",\n  \"name\": \"Booking Confirmed\",\n  \"subject\": \"Booking {{bookingId}} confirmed\",\n  \"body\": \"Hi {{firstName}}, your booking {{bookingId}} is confirmed.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Template by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/templates/{{templateId}}"
+          }
+        },
+        {
+          "name": "List Templates",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/templates?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Update Template (Bearer)",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/v1/templates/{{templateId}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Booking Confirmed\",\n  \"body\": \"Hi {{firstName}}, your booking {{bookingId}} is confirmed for {{travelDate}}.\",\n  \"isActive\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Template (Bearer)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/templates/{{templateId}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Preferences",
+      "item": [
+        {
+          "name": "Get Recipient Preferences",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/recipients/{{recipientId}}/preferences"
+          }
+        },
+        {
+          "name": "Update Recipient Preferences",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/v1/recipients/{{recipientId}}/preferences",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emailOptOut\": false,\n  \"smsOptOut\": true,\n  \"pushOptOut\": false,\n  \"locale\": \"en\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Release (SQA)",
+      "item": [
+        {
+          "name": "Get Release Info",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/release",
+            "description": "Returns current service release/change information for SQA/testers."
+          }
+        }
+      ]
+    }
+  ]
+}
