@@ -1,0 +1,68 @@
+{
+  "service": "PaymentService",
+  "version": "1.0.0",
+  "releaseDate": "2026-08-10",
+  "environment": "Production",
+  "status": "Released",
+  "features": [
+    "Payment intent creation with idempotency",
+    "Payment processing lifecycle",
+    "Full and partial refund support",
+    "Webhook processing",
+    "Transactional outbox",
+    "RabbitMQ event publishing",
+    "Multi-provider database support",
+    "JWT authentication",
+    "Rate limiting",
+    "OpenTelemetry tracing",
+    "Prometheus metrics",
+    "Health checks",
+    "Structured logging"
+  ],
+  "dependencies": {
+    "postgresql": "Required",
+    "rabbitmq": "Required",
+    "redis": "Optional (cache)",
+    "authService": "Required (JWT validation)"
+  },
+  "apiEndpoints": [
+    "POST /api/v1/payments",
+    "GET /api/v1/payments/{id}",
+    "GET /api/v1/payments",
+    "GET /api/v1/payments/search",
+    "POST /api/v1/payments/{id}/process",
+    "POST /api/v1/payments/{id}/confirm",
+    "POST /api/v1/payments/{id}/fail",
+    "POST /api/v1/payments/{id}/cancel",
+    "POST /api/v1/payments/{id}/refund",
+    "POST /api/v1/webhooks/{providerName}"
+  ],
+  "events": [
+    "payment.created",
+    "payment.processing",
+    "payment.succeeded",
+    "payment.failed",
+    "payment.cancelled",
+    "payment.refunded"
+  ],
+  "database": {
+    "schema": "payment",
+    "tables": [
+      "payments",
+      "payment_refunds",
+      "outbox_messages"
+    ]
+  },
+  "metrics": [
+    "payment.created",
+    "payment.succeeded",
+    "payment.failed",
+    "refund.created",
+    "refund.succeeded",
+    "payment.idempotency.conflict",
+    "payment.circuitbreaker.opened",
+    "payment.latency",
+    "payment.provider.latency"
+  ],
+  "contact": "Platform Engineering Team"
+}

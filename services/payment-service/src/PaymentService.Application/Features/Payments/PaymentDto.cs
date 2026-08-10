@@ -1,0 +1,26 @@
+namespace PaymentService.Application.Features.Payments;
+
+public sealed record PaymentDto(
+    Guid Id,
+    Guid TenantId,
+    Guid? CompanyId,
+    Guid? OrganizationId,
+    Guid CustomerId,
+    string OrderReference,
+    string Status,
+    string PaymentMethod,
+    decimal Amount,
+    string Currency,
+    decimal? FeeAmount,
+    decimal? TaxAmount,
+    string? ProviderReference,
+    string? ProviderPaymentId,
+    string? FailureReason,
+    string? FailureCode,
+    decimal TotalRefundedAmount,
+    decimal AvailableRefundAmount,
+    bool IsRefundable,
+    DateTimeOffset ExpiresAtUtc,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? UpdatedAtUtc,
+    DateTimeOffset? ProcessedAtUtc);
