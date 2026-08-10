@@ -5,4 +5,5 @@ public sealed record RefundProviderRequest(
     decimal RefundAmount,
     string Currency,
     string? RefundReason = null,
-    string? IdempotencyKey = null);
+    string? IdempotencyKey = null,
+    string? CorrelationId = null);

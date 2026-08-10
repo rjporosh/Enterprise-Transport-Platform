@@ -8,4 +8,5 @@ public sealed record PaymentProviderRequest(
     Guid CustomerId,
     string PaymentMethod,
     string? IdempotencyKey = null,
+    string? CorrelationId = null,
     Dictionary<string, string>? Metadata = null);

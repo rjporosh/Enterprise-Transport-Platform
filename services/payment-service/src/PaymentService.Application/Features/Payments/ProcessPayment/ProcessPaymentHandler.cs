@@ -6,6 +6,7 @@ using PaymentService.Application.Common.Models;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Exceptions;
+using Microsoft.AspNetCore.Http;
 
 namespace PaymentService.Application.Features.Payments.ProcessPayment;
 
@@ -16,6 +17,7 @@ public class ProcessPaymentHandler : IRequestHandler<ProcessPaymentCommand, Proc
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IEventPublisher _eventPublisher;
     private readonly IPaymentMetrics _metrics;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<ProcessPaymentHandler> _logger;
 
     public ProcessPaymentHandler(
@@ -24,6 +26,7 @@ public class ProcessPaymentHandler : IRequestHandler<ProcessPaymentCommand, Proc
         IDateTimeProvider dateTimeProvider,
         IEventPublisher eventPublisher,
         IPaymentMetrics metrics,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<ProcessPaymentHandler> logger)
     {
         _context = context;
@@ -31,11 +34,14 @@ public class ProcessPaymentHandler : IRequestHandler<ProcessPaymentCommand, Proc
         _dateTimeProvider = dateTimeProvider;
         _eventPublisher = eventPublisher;
         _metrics = metrics;
+        _httpContextAccessor = httpContextAccessor;
         _logger = logger;
     }
 
     public async Task<ProcessPaymentResponse> Handle(ProcessPaymentCommand request, CancellationToken cancellationToken)
     {
+        var correlationId = _httpContextAccessor.HttpContext?.Items["CorrelationId"]?.ToString();
+
         _logger.LogInformation("Processing payment {PaymentId}", request.PaymentId);
 
         var payment = await _context.Payments
@@ -56,6 +62,7 @@ public class ProcessPaymentHandler : IRequestHandler<ProcessPaymentCommand, Proc
         }
 
         payment.StartProcessing(request.ProviderReference);
+        await _context.SaveChangesAsync(cancellationToken);
 
         var provider = _providerFactory.GetProvider(payment.PaymentMethod.ToString());
 
@@ -67,6 +74,7 @@ public class ProcessPaymentHandler : IRequestHandler<ProcessPaymentCommand, Proc
             payment.CustomerId,
             payment.PaymentMethod.ToString(),
             payment.IdempotencyKey,
+            correlationId,
             string.IsNullOrEmpty(payment.Metadata) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(payment.Metadata));
 
         PaymentProviderResult providerResult;

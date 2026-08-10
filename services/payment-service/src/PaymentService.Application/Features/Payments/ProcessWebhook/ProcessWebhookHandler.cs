@@ -6,6 +6,7 @@ using PaymentService.Application.Common.Models;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Exceptions;
+using Microsoft.AspNetCore.Http;
 
 namespace PaymentService.Application.Features.Payments.ProcessWebhook;
 
@@ -14,22 +15,26 @@ public class ProcessWebhookHandler : IRequestHandler<ProcessWebhookCommand, Proc
     private readonly IPaymentDbContext _context;
     private readonly IPaymentProviderFactory _providerFactory;
     private readonly IEventPublisher _eventPublisher;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<ProcessWebhookHandler> _logger;
 
     public ProcessWebhookHandler(
         IPaymentDbContext context,
         IPaymentProviderFactory providerFactory,
         IEventPublisher eventPublisher,
+        IHttpContextAccessor httpContextAccessor,
         ILogger<ProcessWebhookHandler> logger)
     {
         _context = context;
         _providerFactory = providerFactory;
         _eventPublisher = eventPublisher;
+        _httpContextAccessor = httpContextAccessor;
         _logger = logger;
     }
 
     public async Task<ProcessWebhookResponse> Handle(ProcessWebhookCommand request, CancellationToken cancellationToken)
     {
+        var correlationId = _httpContextAccessor.HttpContext?.Items["CorrelationId"]?.ToString();
         _logger.LogInformation("Processing webhook {EventType} from provider {ProviderName}", request.EventType, request.ProviderName);
 
         var provider = _providerFactory.GetProvider(request.ProviderName);
@@ -47,6 +52,7 @@ public class ProcessWebhookHandler : IRequestHandler<ProcessWebhookCommand, Proc
                 Guid.Empty,
                 string.Empty,
                 request.EventId,
+                correlationId,
                 null), cancellationToken);
 
             if (providerResult.IsSuccess)
