@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option csharp_namespace = "BusService.Api.Grpc";
+
+package bus;
+
+service BusService {
+  rpc GetBus (GetBusRequest) returns (GetBusResponse);
+  rpc ListBuses (ListBusesRequest) returns (ListBusesResponse);
+}
+
+message GetBusRequest {
+  string bus_id = 1;
+}
+
+message GetBusResponse {
+  string bus_id = 1;
+  string operator_id = 2;
+  string plate_number = 3;
+  string bus_type = 4;
+  int32 total_seats = 5;
+  string depot_id = 6;
+  string status = 7;
+  string manufacturer = 8;
+  string model = 9;
+  int32 year_of_manufacture = 10;
+  bool is_deleted = 11;
+  string created_at_utc = 12;
+  string updated_at_utc = 13;
+}
+
+message ListBusesRequest {
+  string operator_id = 1;
+  string depot_id = 2;
+  string status = 3;
+  int32 page = 4;
+  int32 page_size = 5;
+}
+
+message ListBusesResponse {
+  repeated GetBusResponse buses = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}

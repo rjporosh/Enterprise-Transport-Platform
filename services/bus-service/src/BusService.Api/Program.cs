@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text;
+using System.Threading.RateLimiting;
 using BusService.Api.Diagnostics;
 using BusService.Api.Endpoints;
 using BusService.Api.Middleware;
@@ -8,6 +10,8 @@ using BusService.Application.Common.Interfaces;
 using BusService.Infrastructure;
 using BusService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
@@ -69,6 +73,41 @@ try
 
     builder.Services.AddAuthorization();
 
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.OnRejected = async (context, token) =>
+        {
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.HttpContext.Response.WriteAsJsonAsync(new
+            {
+                type = "https://httpstatuses.io/429",
+                title = "Too many requests.",
+                status = StatusCodes.Status429TooManyRequests,
+                traceId = context.HttpContext.TraceIdentifier,
+                detail = "Rate limit exceeded. Please retry after the window resets."
+            });
+        };
+
+        options.AddPolicy("bus-write", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.GetClientIpAddress() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+        options.AddPolicy("bus-read", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.GetClientIpAddress() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 10
+            }));
+    });
+
     // ---------- OpenAPI / Scalar ----------
     // Native minimal-API OpenAPI document generation + Scalar only — not Swashbuckle.
     // Swashbuckle and the framework's own OpenAPI.NET v2-based generator disagree on
@@ -119,6 +158,12 @@ try
             name: "rabbitmq");
     }
 
+    // ---------- gRPC ----------
+    builder.Services.AddGrpc(options =>
+    {
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    });
+
     // ---------- OpenTelemetry ----------
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource.AddService(serviceName: "bus-service", serviceVersion: "1.0.0"))
@@ -141,6 +186,8 @@ try
     app.UseSerilogRequestLogging();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseMiddleware<RequestContextMiddleware>();
+    app.UseMiddleware<IdempotencyMiddleware>();
+    app.UseRateLimiter();
 
     if (app.Environment.IsDevelopment())
     {
@@ -158,6 +205,7 @@ try
     app.MapBusEndpoints();
     app.MapHealthChecks("/health");
     app.MapPrometheusScrapingEndpoint("/metrics");
+    app.MapGrpcService<BusService.Api.Grpc.BusGrpcService>();
 
     // ---------- Dev-only auto-migrate ----------
     if (app.Environment.IsDevelopment())
