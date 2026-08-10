@@ -156,6 +156,7 @@ try
     app.MapScalarApiReference();
 
     app.MapPaymentEndpoints();
+    app.MapAgentPaymentMethodEndpoints();
 
     app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
     app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = r => r.Name != "postgres" });
