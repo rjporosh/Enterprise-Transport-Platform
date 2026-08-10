@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "Bus Service — Postman Collection",
+    "description": "End-to-end API collection for Bus Service. Base URL defaults to http://localhost:5201. All endpoints require a Bearer JWT issued by Auth Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5201" },
+    { "key": "authToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Depots",
+      "item": [
+        {
+          "name": "Create Depot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"name\": \"Central Depot\", \"city\": \"Dhaka\", \"address\": \"123 Main St\", \"tenantId\": \"{{$guid}}\", \"companyId\": \"{{$guid}}\", \"organizationId\": \"{{$guid}}\"}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/depots", "path": ["api", "v1", "depots"] }
+          }
+        },
+        {
+          "name": "List Depots",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/depots?city=Dhaka", "path": ["api", "v1", "depots"], "query": [{ "key": "city", "value": "Dhaka" }] }
+          }
+        },
+        {
+          "name": "Soft Delete Depot",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/depots/{{depotId}}", "path": ["api", "v1", "depots", "{{depotId}}"] }
+          }
+        },
+        {
+          "name": "Restore Depot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/depots/{{depotId}}/restore", "path": ["api", "v1", "depots", "{{depotId}}", "restore"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Buses",
+      "item": [
+        {
+          "name": "Register Bus",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"operatorId\": \"{{$guid}}\", \"plateNumber\": \"DHA-1234\", \"busType\": \"AcSleeper\", \"totalSeats\": 40, \"depotId\": \"{{depotId}}\", \"manufacturer\": \"Volvo\", \"model\": \"9600\", \"yearOfManufacture\": 2022, \"tenantId\": \"{{$guid}}\", \"companyId\": \"{{$guid}}\", \"organizationId\": \"{{$guid}}\"}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/buses", "path": ["api", "v1", "buses"] }
+          }
+        },
+        {
+          "name": "Get Bus",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/buses/{{busId}}", "path": ["api", "v1", "buses", "{{busId}}"] }
+          }
+        },
+        {
+          "name": "List Buses",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/buses?status=Active&page=1&pageSize=20", "path": ["api", "v1", "buses"], "query": [{ "key": "status", "value": "Active" }, { "key": "page", "value": "1" }, { "key": "pageSize", "value": "20" }] }
+          }
+        },
+        {
+          "name": "Update Bus Details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"busType\": \"NonAcSleeper\", \"totalSeats\": 36, \"depotId\": \"{{depotId}}\", \"manufacturer\": \"Scania\", \"model\": \"Metrolink\", \"yearOfManufacture\": 2023}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/buses/{{busId}}", "path": ["api", "v1", "buses", "{{busId}}"] }
+          }
+        },
+        {
+          "name": "Change Bus Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"newStatus\": \"UnderMaintenance\"}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/buses/{{busId}}/status", "path": ["api", "v1", "buses", "{{busId}}", "status"] }
+          }
+        },
+        {
+          "name": "Soft Delete Bus",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/buses/{{busId}}", "path": ["api", "v1", "buses", "{{busId}}"] }
+          }
+        },
+        {
+          "name": "Restore Bus",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/v1/buses/{{busId}}/restore", "path": ["api", "v1", "buses", "{{busId}}", "restore"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Release Info",
+      "item": [
+        {
+          "name": "Get Release Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/v1/release-info", "path": ["api", "v1", "release-info"] }
+          }
+        }
+      ]
+    }
+  ]
+}
