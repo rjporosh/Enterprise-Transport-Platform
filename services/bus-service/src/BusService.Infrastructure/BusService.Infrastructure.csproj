@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>BusService.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <!--
+      Database portability (matching Auth Service exactly — see
+      docs/architecture/bus-service-architecture.md, "Database portability").
+      All three providers are always referenced; which one is actually
+      instantiated is the runtime "Database:Provider" switch in
+      DependencyInjection.cs.
+    -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <!--
+      Pomelo has not shipped an official EF Core 10-compatible release as of
+      this writing (their EF Core 10 upgrade is still work-in-progress
+      upstream — same situation documented in Auth Service's
+      Infrastructure.csproj). Suppressed deliberately, not silently.
+    -->
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" NoWarn="NU1608" />
+    <!--
+      Transitive dependency (via Microsoft.EntityFrameworkCore.SqlServer ->
+      Microsoft.Data.SqlClient) resolves to a version with known DoS
+      advisories; pinned to a patched version to override it — same fix as
+      Auth Service.
+    -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <!-- IMeterFactory (used by BusMetrics) — referenced explicitly rather than relying on it arriving transitively. -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BusService.Application\BusService.Application.csproj" />
+  </ItemGroup>
+
+</Project>

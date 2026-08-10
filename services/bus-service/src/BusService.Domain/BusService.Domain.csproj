@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>BusService.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same convention as Auth/Booking Service: MediatR.Contracts only, for INotification, so domain events dispatch via MediatR without pulling EF Core/ASP.NET into Domain. -->
+    <PackageReference Include="MediatR.Contracts" Version="2.0.1" />
+  </ItemGroup>
+
+</Project>
