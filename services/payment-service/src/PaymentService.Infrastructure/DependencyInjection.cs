@@ -8,7 +8,9 @@ using PaymentService.Infrastructure.Messaging;
 using PaymentService.Infrastructure.Observability;
 using PaymentService.Infrastructure.Persistence;
 using PaymentService.Infrastructure.Persistence.Outbox;
+using PaymentService.Infrastructure.Providers;
 using Pomelo.EntityFrameworkCore.MySql;
+using System.Net.Http.Headers;
 
 namespace PaymentService.Infrastructure;
 
@@ -31,9 +33,19 @@ public static class DependencyInjection
 
         services.Configure<RedisOptions>(configuration.GetSection("Redis"));
         services.Configure<RabbitMqOptions>(configuration.GetSection("RabbitMQ"));
+        services.Configure<BkashOptions>(configuration.GetSection("Bkash"));
+
+        services.AddHttpClient("Bkash", (sp, client) =>
+        {
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BkashOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
 
         services.AddSingleton<IMessageBusPublisher, RabbitMqPublisher>();
         services.AddSingleton<IPaymentProviderFactory, PaymentProviderFactory>();
+        services.AddSingleton<DefaultPaymentProvider>();
+        services.AddSingleton<BkashPaymentProvider>();
 
         services.AddHostedService<OutboxProcessor>();
 
