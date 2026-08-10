@@ -60,3 +60,37 @@ NBomberRunner
     .WithReportFolder("reports")
     .WithReportFormats(NBomber.Contracts.Stats.ReportFormat.Html, NBomber.Contracts.Stats.ReportFormat.Csv)
     .Run();
+
+var otpScenario = Scenario.Create("auth_flow_with_otp", async context =>
+{
+    var email = registeredEmails[Random.Shared.Next(registeredEmails.Count)];
+
+    var loginRequest = Http.CreateRequest("POST", "/api/v1/auth/login")
+        .WithHeader("Content-Type", "application/json")
+        .WithBody(new StringContent(JsonSerializer.Serialize(new { email, password })));
+
+    var loginResponse = await Http.Send(httpClient, loginRequest);
+    if (loginResponse.StatusCode != "200")
+        return Response.Fail(statusCode: loginResponse.StatusCode);
+
+    var loginBody = JsonDocument.Parse(await loginResponse.Content.ReadAsStringAsync());
+    var userId = loginBody.RootElement.GetProperty("userId").GetString();
+
+    var otpRequest = Http.CreateRequest("POST", "/api/v1/auth/otp/request")
+        .WithHeader("Content-Type", "application/json")
+        .WithBody(new StringContent(JsonSerializer.Serialize(new { userId, channel = "email", destination = email })));
+
+    var otpResponse = await Http.Send(httpClient, otpRequest);
+    return otpResponse.StatusCode == "204" ? Response.Ok(statusCode: otpResponse.StatusCode) : Response.Fail(statusCode: otpResponse.StatusCode);
+})
+.WithLoadSimulations(
+    Simulation.RampingInject(rate: 10, interval: TimeSpan.FromSeconds(1), during: TimeSpan.FromSeconds(30)),
+    Simulation.Inject(rate: 10, interval: TimeSpan.FromSeconds(1), during: TimeSpan.FromMinutes(1)),
+    Simulation.RampingInject(rate: 0, interval: TimeSpan.FromSeconds(1), during: TimeSpan.FromSeconds(30))
+);
+
+NBomberRunner
+    .RegisterScenarios(loginScenario, otpScenario)
+    .WithReportFolder("reports")
+    .WithReportFormats(NBomber.Contracts.Stats.ReportFormat.Html, NBomber.Contracts.Stats.ReportFormat.Csv)
+    .Run();

@@ -122,7 +122,7 @@ public sealed class AuthApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Login_WithWrongPassword_Returns401_AndDoesNotRevealWhetherEmailExists()
+    public async Task Login_WithWrongPassword_Returns401_AndDoesNotRealWhetherEmailExists()
     {
         var knownEmail = $"{Guid.NewGuid():N}@example.com";
         await _client.PostAsJsonAsync("/api/v1/auth/register", new { email = knownEmail, password = "correct-horse-battery-staple", firstName = "A", lastName = "B", phoneNumber = (string?)null });
@@ -135,9 +135,72 @@ public sealed class AuthApiTests : IAsyncLifetime
 
         var wrongPasswordBody = await wrongPasswordResponse.Content.ReadAsStringAsync();
         var unknownEmailBody = await unknownEmailResponse.Content.ReadAsStringAsync();
-        // Same ProblemDetails "title" either way — never let a client distinguish the two cases.
         JsonDocument.Parse(wrongPasswordBody).RootElement.GetProperty("title").GetString()
             .Should().Be(JsonDocument.Parse(unknownEmailBody).RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task ForgotPassword_WithKnownEmail_ReturnsNoContent()
+    {
+        var email = $"{Guid.NewGuid():N}@example.com";
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = "correct-horse-battery-staple", firstName = "A", lastName = "B", phoneNumber = (string?)null });
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/forgot-password", new { email });
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task OTP_RequestAndVerify_ReturnsSuccess()
+    {
+        var email = $"{Guid.NewGuid():N}@example.com";
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = "correct-horse-battery-staple", firstName = "A", lastName = "B", phoneNumber = (string?)null });
+        var registerBody = await registerResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var userId = registerBody.GetProperty("userId").GetString();
+
+        var otpResponse = await _client.PostAsJsonAsync("/api/v1/auth/otp/request", new { userId, channel = "email", destination = email });
+        otpResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task SecurityQuestions_ConfigureAndVerify_ReturnsSuccess()
+    {
+        var email = $"{Guid.NewGuid():N}@example.com";
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = "correct-horse-battery-staple", firstName = "A", lastName = "B", phoneNumber = (string?)null });
+        var registerBody = await registerResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var accessToken = registerBody.GetProperty("accessToken").GetString();
+        var userId = registerBody.GetProperty("userId").GetString();
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        var questionId = Guid.NewGuid();
+        var configureResponse = await _client.PostAsJsonAsync("/api/v1/auth/security-questions/configure", new
+        {
+            questionAnswers = new Dictionary<Guid, string> { [questionId] = "TestAnswer" }
+        });
+        configureResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var verifyResponse = await _client.PostAsJsonAsync("/api/v1/auth/security-questions/verify", new
+        {
+            userId,
+            questionAnswers = new Dictionary<Guid, string> { [questionId] = "testanswer" }
+        });
+        verifyResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Admin_ListPermissions_ReturnsSuccess()
+    {
+        var email = $"{Guid.NewGuid():N}@example.com";
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = "correct-horse-battery-staple", firstName = "Admin", lastName = "User", phoneNumber = (string?)null });
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "correct-horse-battery-staple" });
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var accessToken = loginBody.GetProperty("accessToken").GetString();
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _client.GetAsync("/api/v1/admin/permissions");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     public async Task DisposeAsync()
