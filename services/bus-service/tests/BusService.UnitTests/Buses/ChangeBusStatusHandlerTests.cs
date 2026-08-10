@@ -28,7 +28,7 @@ public class ChangeBusStatusHandlerTests : IDisposable
         var depotId = Guid.NewGuid();
         _context.Depots.Add(Depot.Create(depotId, "Central Depot", "Dhaka", null));
 
-        _bus = Bus.Register(Guid.NewGuid(), Guid.NewGuid(), "DL-1PC-1234", BusType.AcSleeper, 40, depotId, null, null, null, _clock.UtcNow);
+        _bus = Bus.Register(Guid.NewGuid(), Guid.NewGuid(), "DL-1PC-1234", BusType.AcSleeper, 40, depotId, null, null, null, null, null, null, _clock.UtcNow);
         _bus.ClearDomainEvents();
         _context.Buses.Add(_bus);
         _context.SaveChanges();

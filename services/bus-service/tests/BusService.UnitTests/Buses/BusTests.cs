@@ -16,7 +16,7 @@ public class BusTests
     [Fact]
     public void Register_CreatesActiveBus_AndRaisesBusRegisteredEvent()
     {
-        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "dl-1pc-1234", BusType.AcSleeper, 40, DepotId, "Volvo", "9600", 2022, Now);
+        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "dl-1pc-1234", BusType.AcSleeper, 40, DepotId, "Volvo", "9600", 2022, null, null, null, Now);
 
         bus.PlateNumber.Should().Be("DL-1PC-1234"); // normalized
         bus.Status.Should().Be(BusStatus.Active);
@@ -33,7 +33,7 @@ public class BusTests
     [InlineData(BusStatus.Active, BusStatus.Active, false)]
     public void ChangeStatus_EnforcesLifecycleRules(BusStatus from, BusStatus to, bool shouldSucceed)
     {
-        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "DL-1PC-1234", BusType.AcSleeper, 40, DepotId, null, null, null, Now);
+        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "DL-1PC-1234", BusType.AcSleeper, 40, DepotId, null, null, null, null, null, null, Now);
         bus.ClearDomainEvents();
 
         if (from != BusStatus.Active)
@@ -58,7 +58,7 @@ public class BusTests
     [Fact]
     public void UpdateDetails_ChangesFields_AndRaisesBusDetailsUpdatedEvent()
     {
-        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "DL-1PC-1234", BusType.AcSleeper, 40, DepotId, null, null, null, Now);
+        var bus = Bus.Register(Guid.NewGuid(), OperatorId, "DL-1PC-1234", BusType.AcSleeper, 40, DepotId, null, null, null, null, null, null, Now);
         bus.ClearDomainEvents();
 
         var newDepotId = Guid.NewGuid();
