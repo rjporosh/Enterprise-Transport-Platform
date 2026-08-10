@@ -52,10 +52,36 @@ dotnet ef database update --project src/PaymentService.Infrastructure --startup-
 3. Set `Bkash:BaseUrl` to `https://tokenized.sandbox.bka.sh/v1.2.0-beta` (sandbox) or production URL
 4. Set `Bkash:CallbackUrl` to your publicly reachable HTTPS endpoint (e.g. `https://api.yourdomain.com/api/v1/webhooks/bkash`)
 5. The provider uses `merchantInvoiceNumber` = payment `IdempotencyKey` for idempotent charge creation
+6. Configure `Bkash:WebhookSecret` for webhook signature verification
 
-### Nagad Setup (Coming Soon)
+### Nagad Setup
 
-Nagad integration follows the same pattern. Create `NagadPaymentProvider`, register in factory, and configure via `Nagad:*` appsettings.
+1. Register as a merchant on [Nagad Developer Portal](https://nagad.com.bd/developer-portal)
+2. Obtain `MerchantId` and `SecretKey` from the sandbox/production dashboard
+3. Set `Nagad:BaseUrl` to `https://api-sandbox.nagad.com.bd` (sandbox) or production URL
+4. Set `Nagad:CallbackUrl` to your publicly reachable HTTPS endpoint (e.g. `https://api.yourdomain.com/api/v1/webhooks/nagad`)
+5. Configure `Nagad:WebhookSecret` for webhook signature verification
+
+### Stripe Setup (Card Processing)
+
+1. Create a Stripe account at https://stripe.com
+2. Obtain `SecretKey` (sk_test_... or sk_live_...) and `PublishableKey` (pk_test_... or pk_live_...)
+3. Set `Stripe:BaseUrl` to `https://api.stripe.com/v1`
+4. Set `Stripe:WebhookSecret` from Stripe Dashboard → Webhooks → Endpoint secret
+5. The provider creates PaymentIntents with `payment_method_types: ["card"]`
+6. Frontend should use Stripe.js/Elements with the `client_secret` returned in `RawResponse`
+
+### Webhook Signature Verification
+
+All webhook endpoints (`/api/v1/webhooks/{providerName}`) verify signatures before processing:
+
+| Provider | Header | Verification Method |
+|----------|--------|---------------------|
+| bKash | `X-Bkash-Signature` | HMAC-SHA256 of payload using `Bkash:WebhookSecret` |
+| Nagad | `X-Nagad-Signature` | HMAC-SHA256 of payload using `Nagad:WebhookSecret` |
+| Stripe | `Stripe-Signature` | Stripe `t=timestamp,v1=signature` format with 5-minute tolerance |
+
+To disable verification in development, leave the `WebhookSecret` empty — the provider will reject all webhooks.
 
 ## Agent / Merchant / Personal Payment Methods
 

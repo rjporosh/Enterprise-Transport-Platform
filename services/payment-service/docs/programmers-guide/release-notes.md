@@ -1,5 +1,32 @@
 # Payment Service - Release Notes
 
+## v1.2.0 - Phase 2: Nagad + Stripe + Webhook Signature Verification
+
+### Features
+
+- Real Nagad tokenized payment provider (sandbox-ready)
+- Real Stripe PaymentIntent provider for card processing (MasterCard/Visa)
+- Webhook signature verification for all providers:
+  - bKash: HMAC-SHA256 via `X-Bkash-Signature`
+  - Nagad: HMAC-SHA256 via `X-Nagad-Signature`
+  - Stripe: `Stripe-Signature` header with timestamp tolerance
+- PaymentProviderFactory resolves Nagad and Stripe from DI
+- Named HttpClients registered for Nagad and Stripe
+
+### Database
+
+- No schema changes
+
+### Testing
+
+- 8 new unit tests for webhook signature verification (bKash, Nagad, Stripe)
+- Total: 32 passing unit tests
+
+### Known Limitations
+
+- Scheduled reconciliation jobs require Quartz.NET integration
+- Card processing requires Stripe account and webhook endpoint configuration
+
 ## v1.1.0 - Phase 1: Agent Payment Methods + bKash Provider
 
 ### Features

@@ -20,8 +20,11 @@ Enterprise-grade payment transaction lifecycle management for the Enterprise Tra
 - Query logging
 - Agent/merchant/personal payment method management (bKash, Nagad, bank accounts)
 - Real bKash payment provider integration (sandbox ready)
+- Real Nagad payment provider integration (sandbox ready)
+- Real Stripe card payment provider (MasterCard/Visa)
 - Polly retry, timeout, and circuit breaker for provider resilience
 - Correlation ID propagation across HTTP and provider calls
+- Webhook signature verification (bKash HMAC-SHA256, Nagad HMAC-SHA256, Stripe Stripe-Signature)
 
 ## Technology Stack
 

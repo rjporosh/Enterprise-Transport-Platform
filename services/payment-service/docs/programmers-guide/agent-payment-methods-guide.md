@@ -116,7 +116,7 @@ curl -X POST https://api.yourdomain.com/api/v1/agents/{agentId}/payment-methods 
   }'
 ```
 
-> **Note:** Nagad provider integration is coming soon. The endpoint accepts the registration, but actual payout processing requires the `NagadPaymentProvider` to be implemented.
+> **Note:** Nagad numbers are processed via the Nagad payment provider. Ensure `Nagad:*` configuration is set in `appsettings.json`.
 
 ## Payment Method Types Reference
 
@@ -171,7 +171,7 @@ When a customer pays at a POS terminal or through an online checkout:
 }
 ```
 
-### Nagad (coming soon)
+### Nagad
 
 ```json
 {
