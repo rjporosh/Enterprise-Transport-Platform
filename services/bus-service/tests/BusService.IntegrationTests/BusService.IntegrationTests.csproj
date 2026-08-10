@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>BusService.IntegrationTests</RootNamespace>
+    <NoWarn>NU1608;NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

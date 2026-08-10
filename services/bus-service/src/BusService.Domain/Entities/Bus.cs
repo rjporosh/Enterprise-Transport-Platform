@@ -5,13 +5,6 @@ using BusService.Domain.Exceptions;
 
 namespace BusService.Domain.Entities;
 
-/// <summary>
-/// Aggregate root for a single vehicle in the fleet. This is the canonical
-/// (source-of-truth) definition — Booking Service keeps a read-only,
-/// denormalized replica of the fields it needs (OperatorId, PlateNumber,
-/// BusType, TotalSeats) synced via the domain events raised here, exactly
-/// as documented in that service's own Entities/Bus.cs.
-/// </summary>
 public sealed class Bus : AggregateRoot
 {
     public Guid OperatorId { get; private set; }
@@ -23,14 +16,21 @@ public sealed class Bus : AggregateRoot
     public string? Manufacturer { get; private set; }
     public string? Model { get; private set; }
     public int? YearOfManufacture { get; private set; }
+    public Guid? TenantId { get; private set; }
+    public Guid? CompanyId { get; private set; }
+    public Guid? OrganizationId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
+    public new uint Version { get; private set; }
+    public bool IsDeleted { get; private set; }
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+    public string? DeletedBy { get; private set; }
 
     private Bus() { } // EF Core
 
     private Bus(
         Guid id, Guid operatorId, string plateNumber, BusType busType, int totalSeats, Guid depotId,
-        string? manufacturer, string? model, int? yearOfManufacture, DateTimeOffset now)
+        string? manufacturer, string? model, int? yearOfManufacture, Guid? tenantId, Guid? companyId, Guid? organizationId, DateTimeOffset now)
         : base(id)
     {
         OperatorId = operatorId;
@@ -42,27 +42,22 @@ public sealed class Bus : AggregateRoot
         Manufacturer = manufacturer;
         Model = model;
         YearOfManufacture = yearOfManufacture;
+        TenantId = tenantId;
+        CompanyId = companyId;
+        OrganizationId = organizationId;
         CreatedAtUtc = now;
         UpdatedAtUtc = now;
     }
 
     public static Bus Register(
         Guid id, Guid operatorId, string plateNumber, BusType busType, int totalSeats, Guid depotId,
-        string? manufacturer, string? model, int? yearOfManufacture, DateTimeOffset now)
+        string? manufacturer, string? model, int? yearOfManufacture, Guid? tenantId, Guid? companyId, Guid? organizationId, DateTimeOffset now)
     {
-        var bus = new Bus(id, operatorId, plateNumber, busType, totalSeats, depotId, manufacturer, model, yearOfManufacture, now);
+        var bus = new Bus(id, operatorId, plateNumber, busType, totalSeats, depotId, manufacturer, model, yearOfManufacture, tenantId, companyId, organizationId, now);
         bus.Raise(new BusRegisteredDomainEvent(bus.Id, bus.OperatorId, bus.PlateNumber, bus.BusType, bus.TotalSeats, bus.DepotId));
         return bus;
     }
 
-    /// <summary>
-    /// Updates the fields Booking Service's replica cares about, plus basic
-    /// fleet details. Deliberately does NOT allow changing PlateNumber or
-    /// OperatorId here — a plate reassignment or ownership transfer is a
-    /// distinct, rarer operation with its own audit trail needs, not a
-    /// routine detail edit; not built in this pass (see README, "Known
-    /// gaps").
-    /// </summary>
     public void UpdateDetails(BusType busType, int totalSeats, Guid depotId, string? manufacturer, string? model, int? yearOfManufacture, DateTimeOffset now)
     {
         BusType = busType;
@@ -76,13 +71,6 @@ public sealed class Bus : AggregateRoot
         Raise(new BusDetailsUpdatedDomainEvent(Id, PlateNumber, BusType, TotalSeats));
     }
 
-    /// <summary>
-    /// Status transitions: Active &lt;-&gt; UnderMaintenance freely; either can
-    /// move to Retired; Retired is terminal (no transitions out). Retiring
-    /// a bus is one-way by design — see docs/architecture, "Bus lifecycle"
-    /// for why (a retired vehicle re-entering the fleet is modeled as a new
-    /// registration, keeping the audit history of the retired one intact).
-    /// </summary>
     public void ChangeStatus(BusStatus newStatus, DateTimeOffset now)
     {
         var isValidTransition = (Status, newStatus) switch
@@ -102,5 +90,27 @@ public sealed class Bus : AggregateRoot
         UpdatedAtUtc = now;
 
         Raise(new BusStatusChangedDomainEvent(Id, oldStatus, newStatus));
+    }
+
+    public void SoftDelete(string deletedBy, DateTimeOffset now)
+    {
+        if (IsDeleted) return;
+        IsDeleted = true;
+        DeletedAtUtc = now;
+        DeletedBy = deletedBy;
+        UpdatedAtUtc = now;
+        Status = BusStatus.Retired;
+        Raise(new BusSoftDeletedDomainEvent(Id, deletedBy));
+    }
+
+    public void Restore(DateTimeOffset now)
+    {
+        if (!IsDeleted) return;
+        IsDeleted = false;
+        DeletedAtUtc = null;
+        DeletedBy = null;
+        UpdatedAtUtc = now;
+        Status = BusStatus.Active;
+        Raise(new BusRestoredDomainEvent(Id));
     }
 }
