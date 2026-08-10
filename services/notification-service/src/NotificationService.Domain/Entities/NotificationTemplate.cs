@@ -26,7 +26,7 @@ public sealed class NotificationTemplate : AggregateRoot
     public string? DataPayloadTemplate { get; private set; }
 
     public bool IsActive { get; private set; } = true;
-    public int Version { get; private set; } = 1;
+    public new int Version { get; private set; } = 1;
 
     public bool IsDeleted { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }

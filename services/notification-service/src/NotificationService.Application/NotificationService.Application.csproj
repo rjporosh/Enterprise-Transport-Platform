@@ -18,7 +18,7 @@
          Application depends on EF Core's DbSet<T> for direct LINQ projections in
          query handlers, via INotificationDbContext — never on Npgsql/SqlServer/MySql
          or on Infrastructure itself. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>

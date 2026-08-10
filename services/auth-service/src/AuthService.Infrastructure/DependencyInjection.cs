@@ -1,14 +1,18 @@
 using AuthService.Application.Common.Interfaces;
+using AuthService.Application.Common.Services;
 using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Common;
+using AuthService.Infrastructure.Jobs;
 using AuthService.Infrastructure.Messaging;
 using AuthService.Infrastructure.Observability;
 using AuthService.Infrastructure.Persistence;
 using AuthService.Infrastructure.Persistence.Outbox;
 using AuthService.Infrastructure.Security;
+using AuthService.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Quartz;
 using StackExchange.Redis;
 
 namespace AuthService.Infrastructure;
@@ -28,12 +32,17 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddSingleton<ITokenService, JwtTokenService>();
 
+        services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddScoped<IEmailSender, EmailSender>();
+        services.AddScoped<ISmsSender, SmsSender>();
+        services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<IPasswordHistoryValidator, PasswordHistoryValidator>();
+        services.AddScoped<ISecurityAnswerValidator, SecurityAnswerValidator>();
+
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.AddSingleton<IMessageBusPublisher, RabbitMqPublisher>();
         services.AddHostedService<OutboxProcessor>();
 
-        // Single shared multiplexer for the app's lifetime; AbortOnConnectFail=false
-        // is what makes RedisCacheService's "fail open" behavior true end-to-end.
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
@@ -46,20 +55,21 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddSingleton<IAuthMetrics, AuthMetrics>();
 
+        services.AddQuartz(q =>
+        {
+            q.UseMicrosoftDependencyInjectionJobFactory();
+            var jobKey = new JobKey(nameof(OtpCleanupJob));
+            q.AddJob<OtpCleanupJob>(opts => opts.WithIdentity(jobKey));
+            q.AddTrigger(opts => opts
+                .ForJob(jobKey)
+                .WithIdentity($"{nameof(OtpCleanupJob)}-trigger")
+                .WithSchedule(CronScheduleBuilder.DailyAtHourAndMinute(3, 0)));
+        });
+        services.AddQuartzHostedService();
+
         return services;
     }
 
-    /// <summary>
-    /// "Database:Provider" in appsettings picks the EF Core provider at
-    /// startup — Postgres | SqlServer | MySql — with zero code changes
-    /// elsewhere in the app, satisfying the "switch DB easily" requirement.
-    /// The connection string always comes from ConnectionStrings:AuthDb; its
-    /// format just needs to match whichever provider is selected.
-    /// See docs/architecture/auth-service-architecture.md, "Database
-    /// portability" for the migration-generation implication (EF Core
-    /// migrations are provider-specific — switching providers means
-    /// regenerating migrations, not just flipping this setting in prod).
-    /// </summary>
     private static void AddDatabase(IServiceCollection services, IConfiguration configuration)
     {
         var provider = configuration["Database:Provider"] ?? "Postgres";
@@ -86,9 +96,6 @@ public static class DependencyInjection
                     break;
 
                 case "mysql":
-                    // Pomelo needs an explicit server version; AutoDetect requires
-                    // an open connection at startup, which we deliberately avoid
-                    // (fail fast on a real query, not on DI container build).
                     options.UseMySql(connectionString, ServerVersion.Create(new Version(8, 0, 0), Pomelo.EntityFrameworkCore.MySql.Infrastructure.ServerType.MySql), mysql =>
                         mysql.MigrationsAssembly("AuthService.Infrastructure"));
                     break;

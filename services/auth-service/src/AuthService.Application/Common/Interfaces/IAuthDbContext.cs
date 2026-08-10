@@ -3,10 +3,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.Application.Common.Interfaces;
 
-/// <summary>
-/// Everything a CQRS handler needs from persistence, without depending on
-/// EF Core's DbContext type or any provider package directly.
-/// </summary>
 public interface IAuthDbContext
 {
     DbSet<User> Users { get; }
@@ -14,6 +10,20 @@ public interface IAuthDbContext
     DbSet<UserRole> UserRoles { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<Permission> Permissions { get; }
+    DbSet<Module> Modules { get; }
+    DbSet<Policy> Policies { get; }
+    DbSet<Claim> Claims { get; }
+    DbSet<OtpRecord> OtpRecords { get; }
+    DbSet<SecurityQuestion> SecurityQuestions { get; }
+    DbSet<SecurityAnswer> SecurityAnswers { get; }
+    DbSet<PasswordHistory> PasswordHistories { get; }
+    DbSet<PasswordResetToken> PasswordResetTokens { get; }
+    DbSet<UserSession> UserSessions { get; }
+    DbSet<UserClaim> UserClaims { get; }
+    DbSet<RolePermission> RolePermissions { get; }
+    DbSet<ModulePermission> ModulePermissions { get; }
+    DbSet<UserSecurityQuestion> UserSecurityQuestions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

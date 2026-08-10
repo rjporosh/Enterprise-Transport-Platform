@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -29,10 +29,10 @@
       rather than silent implementation. See docs/architecture/notification-service-architecture.md,
       "Database portability" for the extension point.
     -->
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" NoWarn="NU1608" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
 
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
@@ -41,14 +41,14 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 
     <!-- Email: MailKit — actively maintained, RFC-correct SMTP client (System.Net.Mail is legacy/unsupported for new code). -->
-    <PackageReference Include="MailKit" Version="4.8.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
 
     <!-- Retry/backoff for channel sends (CLAUDE.md, "Retry Policies"). -->
     <PackageReference Include="Polly" Version="8.5.0" />
     <PackageReference Include="Polly.Extensions" Version="8.5.0" />
 
     <!-- Server-side template rendering (CLAUDE.md, "Templates"): {{variable}} substitution, loops/conditionals for richer templates later. Sandboxed by default — no file/network/reflection access from template source. -->
-    <PackageReference Include="Scriban" Version="5.12.0" />
+    <PackageReference Include="Scriban" Version="7.2.6" />
 
     <!-- Scheduling (CLAUDE.md, "Quartz.NET Jobs" / "Scheduling"). -->
     <PackageReference Include="Quartz" Version="3.13.1" />

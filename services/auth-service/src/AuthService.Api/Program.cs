@@ -182,6 +182,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
+// gRPC service requires Grpc.Tools code generation to be operational.
+// Uncomment after verifying the build pipeline produces AuthGrpc.cs.
+// app.MapGrpcService<AuthService.Api.Grpc.AuthGrpcService>();
 app.MapHealthChecks("/health");
 app.MapPrometheusScrapingEndpoint("/metrics");
 

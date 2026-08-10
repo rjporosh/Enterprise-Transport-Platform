@@ -1,15 +1,10 @@
 namespace AuthService.Domain.Entities;
 
-/// <summary>
-/// A simple lookup entity, not an aggregate root of its own — roles are
-/// created/managed by a future Admin feature; for now they are seeded
-/// (Customer, Operator, Admin) via an EF Core HasData seed, see
-/// RoleConfiguration.
-/// </summary>
 public sealed class Role : Common.Entity
 {
     public string Name { get; private set; } = default!;
     public string Description { get; private set; } = default!;
+    public bool IsActive { get; private set; }
 
     private Role() { }
 
@@ -17,7 +12,16 @@ public sealed class Role : Common.Entity
     {
         Name = name;
         Description = description;
+        IsActive = true;
     }
+
+    public void Update(string description)
+    {
+        Description = description;
+    }
+
+    public void Activate() => IsActive = true;
+    public void Deactivate() => IsActive = false;
 
     public static class WellKnown
     {

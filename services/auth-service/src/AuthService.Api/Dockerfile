@@ -1,31 +1,23 @@
-# syntax=docker/dockerfile:1
-
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-
-COPY ["src/AuthService.Api/AuthService.Api.csproj", "src/AuthService.Api/"]
-COPY ["src/AuthService.Application/AuthService.Application.csproj", "src/AuthService.Application/"]
-COPY ["src/AuthService.Infrastructure/AuthService.Infrastructure.csproj", "src/AuthService.Infrastructure/"]
-COPY ["src/AuthService.Domain/AuthService.Domain.csproj", "src/AuthService.Domain/"]
-RUN dotnet restore "src/AuthService.Api/AuthService.Api.csproj"
-
-COPY . .
-WORKDIR /src/src/AuthService.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
 WORKDIR /app
-
-RUN addgroup --system --gid 1000 appgroup \
-    && adduser --system --uid 1000 --ingroup appgroup appuser
-USER appuser
-
-COPY --from=build /app/publish .
-
-ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+EXPOSE 8081
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+WORKDIR /src
+COPY ["services/auth-service/src/AuthService.Api/AuthService.Api.csproj", "services/auth-service/src/AuthService.Api/"]
+COPY ["services/auth-service/src/AuthService.Application/AuthService.Application.csproj", "services/auth-service/src/AuthService.Application/"]
+COPY ["services/auth-service/src/AuthService.Domain/AuthService.Domain.csproj", "services/auth-service/src/AuthService.Domain/"]
+COPY ["services/auth-service/src/AuthService.Infrastructure/AuthService.Infrastructure.csproj", "services/auth-service/src/AuthService.Infrastructure/"]
+RUN dotnet restore "services/auth-service/src/AuthService.Api/AuthService.Api.csproj"
+COPY . .
+WORKDIR "/src/services/auth-service/src/AuthService.Api"
+RUN dotnet build "AuthService.Api.csproj" -c Release -o /app/build
 
+FROM build AS publish
+RUN dotnet publish "AuthService.Api.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "AuthService.Api.dll"]

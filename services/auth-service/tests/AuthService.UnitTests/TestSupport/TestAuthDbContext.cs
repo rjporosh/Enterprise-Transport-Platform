@@ -4,13 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.UnitTests.TestSupport;
 
-/// <summary>
-/// EF Core InMemory-backed context implementing the same IAuthDbContext
-/// port the real AuthDbContext implements — lets handlers be tested against
-/// real LINQ/EF behavior (Include, projections, uniqueness checks) without
-/// needing Postgres. Provider-specific behavior is instead covered by the
-/// Testcontainers-based integration tests.
-/// </summary>
 public sealed class TestAuthDbContext : DbContext, IAuthDbContext
 {
     public TestAuthDbContext(DbContextOptions<TestAuthDbContext> options) : base(options) { }
@@ -20,6 +13,20 @@ public sealed class TestAuthDbContext : DbContext, IAuthDbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<AuthService.Domain.Entities.Module> Modules => Set<AuthService.Domain.Entities.Module>();
+    public DbSet<Policy> Policies => Set<Policy>();
+    public DbSet<Claim> Claims => Set<Claim>();
+    public DbSet<OtpRecord> OtpRecords => Set<OtpRecord>();
+    public DbSet<SecurityQuestion> SecurityQuestions => Set<SecurityQuestion>();
+    public DbSet<SecurityAnswer> SecurityAnswers => Set<SecurityAnswer>();
+    public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<UserClaim> UserClaims => Set<UserClaim>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<ModulePermission> ModulePermissions => Set<ModulePermission>();
+    public DbSet<UserSecurityQuestion> UserSecurityQuestions => Set<UserSecurityQuestion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,5 +49,19 @@ public sealed class TestAuthDbContext : DbContext, IAuthDbContext
 
         modelBuilder.Entity<RefreshToken>().HasKey(x => x.Id);
         modelBuilder.Entity<AuditLog>().HasKey(x => x.Id);
+        modelBuilder.Entity<Permission>().HasKey(x => x.Id);
+        modelBuilder.Entity<AuthService.Domain.Entities.Module>().HasKey(x => x.Id);
+        modelBuilder.Entity<Policy>().HasKey(x => x.Id);
+        modelBuilder.Entity<Claim>().HasKey(x => x.Id);
+        modelBuilder.Entity<OtpRecord>().HasKey(x => x.Id);
+        modelBuilder.Entity<SecurityQuestion>().HasKey(x => x.Id);
+        modelBuilder.Entity<SecurityAnswer>().HasKey(x => x.Id);
+        modelBuilder.Entity<PasswordHistory>().HasKey(x => x.Id);
+        modelBuilder.Entity<PasswordResetToken>().HasKey(x => x.Id);
+        modelBuilder.Entity<UserSession>().HasKey(x => x.Id);
+        modelBuilder.Entity<UserClaim>().HasKey(x => new { x.UserId, x.Type, x.Value });
+        modelBuilder.Entity<RolePermission>().HasKey(x => new { x.RoleId, x.PermissionId });
+        modelBuilder.Entity<ModulePermission>().HasKey(x => new { x.ModuleId, x.PermissionId });
+        modelBuilder.Entity<UserSecurityQuestion>().HasKey(x => new { x.UserId, x.SecurityQuestionId });
     }
 }

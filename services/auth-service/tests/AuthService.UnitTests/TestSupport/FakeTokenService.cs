@@ -5,7 +5,6 @@ using AuthService.Domain.Entities;
 
 namespace AuthService.UnitTests.TestSupport;
 
-/// <summary>Deterministic stand-in for JwtTokenService — avoids signing real JWTs in unit tests while keeping the hash/raw-token relationship intact for RefreshTokenHandler tests.</summary>
 public sealed class FakeTokenService : ITokenService
 {
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
@@ -22,4 +21,6 @@ public sealed class FakeTokenService : ITokenService
 
     public string HashRefreshToken(string rawToken) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+
+    public System.Security.Claims.ClaimsPrincipal? ValidateAccessToken(string accessToken) => null;
 }

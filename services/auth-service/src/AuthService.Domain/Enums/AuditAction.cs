@@ -1,6 +1,5 @@
 namespace AuthService.Domain.Enums;
 
-/// <summary>Every action the audit trail records — see AuditLog and IAuditLogger. Kept as a closed enum (not a free-text string) so Grafana/queries can filter reliably.</summary>
 public enum AuditAction
 {
     Register = 0,
@@ -10,5 +9,29 @@ public enum AuditAction
     TokenRefresh = 4,
     TokenReuseDetected = 5,
     Logout = 6,
-    PasswordChanged = 7
+    PasswordChanged = 7,
+    PasswordReset = 8,
+    ForgotPassword = 9,
+    OtpRequested = 10,
+    OtpVerified = 11,
+    OtpFailed = 12,
+    SecurityQuestionConfigured = 13,
+    SecurityQuestionVerified = 14,
+    SecurityQuestionFailed = 15,
+    RoleCreated = 16,
+    RoleUpdated = 17,
+    RoleDeleted = 18,
+    PermissionCreated = 19,
+    PermissionUpdated = 20,
+    ModuleCreated = 21,
+    ModuleUpdated = 22,
+    UserRoleChanged = 23,
+    AccountUnlocked = 24,
+    AccountDeactivated = 25,
+    AccountReactivated = 26,
+    UserCreated = 27,
+    UserUpdated = 28,
+    PasswordResetTokenIssued = 29,
+    PasswordResetTokenUsed = 30,
+    PasswordResetTokenExpired = 31
 }
