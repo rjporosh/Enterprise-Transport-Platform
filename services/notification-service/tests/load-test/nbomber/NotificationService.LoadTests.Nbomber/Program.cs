@@ -12,13 +12,11 @@ var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
 Console.WriteLine($"Target: {baseUrl}");
 
 // ===== Load Scenario =====
-// Sustained send-throughput: proves the async-dispatch design keeps the
-// write path fast (DB insert + outbox enqueue only, no provider round-trip).
 var sendLoadScenario = Scenario.Create("send_notification_load", async context =>
 {
     var payload = JsonSerializer.Serialize(new
     {
-        recipient = $"loadtest-{context.ScenarioInfo.InstanceId}-{context.IterationId}@example.com",
+        recipient = $"loadtest-{Guid.NewGuid()}@example.com",
         channel = "Email",
         subject = "Load test",
         body = "This is a NBomber load test notification.",
@@ -46,7 +44,7 @@ var sendStressScenario = Scenario.Create("send_notification_stress", async conte
 {
     var payload = JsonSerializer.Serialize(new
     {
-        recipient = $"stresstest-{context.ScenarioInfo.InstanceId}-{context.IterationId}@example.com",
+        recipient = $"stress-{Guid.NewGuid()}@example.com",
         channel = "Email",
         subject = "Stress test",
         body = "This is a NBomber stress test notification.",
