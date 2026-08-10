@@ -39,6 +39,12 @@ public class ProcessWebhookHandler : IRequestHandler<ProcessWebhookCommand, Proc
 
         var provider = _providerFactory.GetProvider(request.ProviderName);
 
+        if (!provider.VerifyWebhookSignature(request.Payload, request.Signature, request.Timestamp?.ToString("O")))
+        {
+            _logger.LogWarning("Webhook signature verification failed for provider {ProviderName}", request.ProviderName);
+            return new ProcessWebhookResponse(false, null, "InvalidSignature", "Webhook signature verification failed.");
+        }
+
         Payment? payment = null;
         string newStatus = string.Empty;
 

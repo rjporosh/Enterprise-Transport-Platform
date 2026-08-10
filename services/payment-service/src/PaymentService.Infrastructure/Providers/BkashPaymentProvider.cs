@@ -318,6 +318,28 @@ public class BkashPaymentProvider : IPaymentProvider, IDisposable
         return _cachedToken;
     }
 
+    public bool VerifyWebhookSignature(string payload, string? signatureHeader, string? timestampHeader)
+    {
+        if (string.IsNullOrWhiteSpace(_options.WebhookSecret) || string.IsNullOrWhiteSpace(signatureHeader))
+            return false;
+
+        try
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_options.WebhookSecret));
+            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            var computedSignature = Convert.ToHexString(computedHash).ToLowerInvariant();
+            var providedSignature = signatureHeader.Replace("sha256=", string.Empty, StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(computedSignature),
+                Encoding.UTF8.GetBytes(providedSignature));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "bKash webhook signature verification failed");
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         _cachedToken = null;

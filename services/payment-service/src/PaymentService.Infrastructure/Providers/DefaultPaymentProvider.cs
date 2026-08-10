@@ -67,4 +67,9 @@ public class DefaultPaymentProvider : IPaymentProvider
             PaymentProviderStatus.Unknown,
             ProviderReference: providerPaymentId));
     }
+
+    public bool VerifyWebhookSignature(string payload, string? signatureHeader, string? timestampHeader)
+    {
+        return true;
+    }
 }

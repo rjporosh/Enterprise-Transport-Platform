@@ -161,10 +161,24 @@ public static class PaymentEndpoints
         webhookGroup.MapPost("/{providerName}", async (
             string providerName,
             ProcessWebhookCommand command,
+            HttpRequest request,
             ISender sender,
             CancellationToken ct) =>
         {
-            var updatedCommand = command with { ProviderName = providerName };
+            var signature = request.Headers["X-Bkash-Signature"].FirstOrDefault()
+                         ?? request.Headers["X-Nagad-Signature"].FirstOrDefault()
+                         ?? request.Headers["Stripe-Signature"].FirstOrDefault()
+                         ?? command.Signature;
+
+            var timestamp = request.Headers["X-Timestamp"].FirstOrDefault();
+
+            var updatedCommand = command with
+            {
+                ProviderName = providerName,
+                Signature = signature,
+                Timestamp = string.IsNullOrWhiteSpace(timestamp) ? command.Timestamp : DateTimeOffset.Parse(timestamp)
+            };
+
             var result = await sender.Send(updatedCommand, ct);
             return Results.Ok(result);
         })

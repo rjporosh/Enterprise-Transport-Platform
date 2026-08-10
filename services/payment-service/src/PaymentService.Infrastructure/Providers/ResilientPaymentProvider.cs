@@ -66,6 +66,11 @@ public class ResilientPaymentProvider : IPaymentProvider
             "GetStatusAsync");
     }
 
+    public bool VerifyWebhookSignature(string payload, string? signatureHeader, string? timestampHeader)
+    {
+        return _inner.VerifyWebhookSignature(payload, signatureHeader, timestampHeader);
+    }
+
     private async Task<PaymentProviderResult> ExecuteWithResilienceAsync(
         Func<Task<PaymentProviderResult>> operation,
         string operationName)

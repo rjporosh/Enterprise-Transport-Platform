@@ -10,4 +10,5 @@ public interface IPaymentProvider
     Task<PaymentProviderResult> FailAsync(string providerPaymentId, string reason, CancellationToken cancellationToken = default);
     Task<PaymentProviderResult> RefundAsync(RefundProviderRequest request, CancellationToken cancellationToken = default);
     Task<PaymentProviderResult> GetStatusAsync(string providerPaymentId, CancellationToken cancellationToken = default);
+    bool VerifyWebhookSignature(string payload, string? signatureHeader, string? timestampHeader);
 }
