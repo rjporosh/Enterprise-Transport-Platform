@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.Configure<RedisOptions>(configuration.GetSection("Redis"));
         services.Configure<RabbitMqOptions>(configuration.GetSection("RabbitMQ"));
         services.Configure<BkashOptions>(configuration.GetSection("Bkash"));
+        services.Configure<NagadOptions>(configuration.GetSection("Nagad"));
+        services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
 
         services.AddHttpClient("Bkash", (sp, client) =>
         {
@@ -42,10 +44,25 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         });
 
+        services.AddHttpClient("Nagad", (sp, client) =>
+        {
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NagadOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
+
+        services.AddHttpClient("Stripe", (sp, client) =>
+        {
+            client.BaseAddress = new Uri(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<StripeOptions>>().Value.BaseUrl);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
+
         services.AddSingleton<IMessageBusPublisher, RabbitMqPublisher>();
         services.AddSingleton<IPaymentProviderFactory, PaymentProviderFactory>();
         services.AddSingleton<DefaultPaymentProvider>();
         services.AddSingleton<BkashPaymentProvider>();
+        services.AddSingleton<NagadPaymentProvider>();
+        services.AddSingleton<StripePaymentProvider>();
 
         services.AddHostedService<OutboxProcessor>();
 

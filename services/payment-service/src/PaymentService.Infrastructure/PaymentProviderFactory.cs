@@ -20,7 +20,9 @@ public class PaymentProviderFactory : IPaymentProviderFactory
         _providerTypes = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase)
         {
             ["Default"] = typeof(DefaultPaymentProvider),
-            ["Bkash"] = typeof(BkashPaymentProvider)
+            ["Bkash"] = typeof(BkashPaymentProvider),
+            ["Nagad"] = typeof(NagadPaymentProvider),
+            ["Stripe"] = typeof(StripePaymentProvider)
         };
     }
 
