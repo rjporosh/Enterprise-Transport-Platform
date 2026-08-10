@@ -1,6 +1,6 @@
-# Local dev/demo stack for the Booking Service vertical slice.
-# Other services in MASTER_SPEC.md (Auth, Payment, Notification, ...) are not
-# built yet — see ROADMAP.md — so they aren't wired in here either.
+# Local dev/demo stack for the Booking Service and Bus Service vertical slices.
+# Other services in MASTER_SPEC.md (Auth, Payment, ...) are not built yet —
+# see ROADMAP.md — so they aren't wired in here either.
 #
 # NOTE: not run/verified in the environment that generated this repo (no
 # Docker/network access there). Reviewed by hand for correctness; run
@@ -37,6 +37,18 @@ services:
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: bus-ticketing-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
       timeout: 5s
       retries: 10
 
@@ -151,6 +163,54 @@ services:
     ports:
       - "8081:8080"
 
+  # --- Bus Service ---
+  postgres-bus:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-bus
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bus_service
+      POSTGRES_USER: bus_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-bus-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bus_svc -d bus_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  bus-service:
+    build:
+      context: ../../services/bus-service
+      dockerfile: src/BusService.Api/Dockerfile
+    container_name: bus-ticketing-bus-service
+    restart: unless-stopped
+    depends_on:
+      postgres-bus:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__BusDb: "Host=postgres-bus;Port=5432;Database=bus_service;Username=bus_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Redis__ConnectionString: "redis:6379"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+      Cors__AllowedOrigins__0: "http://localhost:4200"
+      Cors__AllowedOrigins__1: "http://localhost:5173"
+    ports:
+      - "5201:8080"
+
 volumes:
   postgres-data:
   postgres-notification-data:
+  postgres-bus-data:
