@@ -38,9 +38,115 @@ dotnet ef database update --project src/PaymentService.Infrastructure --startup-
 
 ## Adding a Payment Provider
 
-1. Create a new class implementing `IPaymentProvider`
-2. Register in `PaymentProviderFactory`
-3. Configure via `Payment:Provider` appsetting
+1. Create a new class implementing `IPaymentProvider` in `src/PaymentService.Infrastructure/Providers/`
+2. Register the provider type in `PaymentProviderFactory._providerTypes`
+3. Register the provider as a singleton in `DependencyInjection.cs`
+4. Add provider-specific options class (e.g. `BkashOptions`) and register with `services.Configure<T>`
+5. Configure via `appsettings.json` under the provider name section (e.g. `Bkash:AppKey`)
+6. If the provider has webhooks, update `ProcessWebhookHandler` to parse provider-specific payloads
+
+### bKash Setup
+
+1. Register as a merchant on [bKash Developer Portal](https://developer.bkash.com/)
+2. Obtain `AppKey`, `AppSecret`, `Username`, `Password` from the sandbox/production dashboard
+3. Set `Bkash:BaseUrl` to `https://tokenized.sandbox.bka.sh/v1.2.0-beta` (sandbox) or production URL
+4. Set `Bkash:CallbackUrl` to your publicly reachable HTTPS endpoint (e.g. `https://api.yourdomain.com/api/v1/webhooks/bkash`)
+5. The provider uses `merchantInvoiceNumber` = payment `IdempotencyKey` for idempotent charge creation
+
+### Nagad Setup (Coming Soon)
+
+Nagad integration follows the same pattern. Create `NagadPaymentProvider`, register in factory, and configure via `Nagad:*` appsettings.
+
+## Agent / Merchant / Personal Payment Methods
+
+Agents, merchants, and personal users can register their bank accounts, bKash numbers, or Nagad numbers to receive payments. This is managed via the `AgentPaymentMethod` entity and the `/api/v1/agents/{agentId}/payment-methods` endpoints.
+
+### How an Agent Adds a Payment Method
+
+1. **Caller authenticates** with JWT token having audience `payment-service`
+2. **POST** `/api/v1/agents/{agentId}/payment-methods` with:
+   ```json
+   {
+     "agentId": "uuid-of-agent",
+     "methodType": "Bkash",
+     "provider": "Bkash",
+     "accountNumber": "017XXXXXXXXX",
+     "accountName": "Agent Name",
+     "metadata": "{\"branch\":\"dhaka\"}"
+   }
+   ```
+3. The service validates the input and creates the payment method record
+4. If the agent has no default method, this is automatically set as default
+
+### Setting a Default Payment Method
+
+```bash
+POST /api/v1/agents/{agentId}/payment-methods/{paymentMethodId}/set-default
+```
+
+This unsets any previous default and marks the specified method as default.
+
+### Verifying a Payment Method
+
+Some providers (e.g. bKash) require verification before payouts:
+
+```bash
+POST /api/v1/agents/{agentId}/payment-methods/{paymentMethodId}/verify
+{
+  "verificationToken": "otp-or-token-from-provider"
+}
+```
+
+### Listing Payment Methods
+
+```bash
+GET /api/v1/agents/{agentId}/payment-methods?onlyVerified=true&page=1&pageSize=20
+```
+
+### Getting the Default Method
+
+```bash
+GET /api/v1/agents/{agentId}/payment-methods/default
+```
+
+### Supported Method Types
+
+| Enum Value | Description | Notes |
+|------------|-------------|-------|
+| `Bkash` | bKash mobile banking | Requires bKash merchant account |
+| `Nagad` | Nagad mobile banking | Coming soon |
+| `BankTransfer` | Direct bank account | Use provider name as bank name (e.g. `Dutch Bangla`, `City Bank`) |
+| `Card` | Credit/Debit card | Processed via Stripe or local acquirer |
+| `Cash` | Cash on delivery / counter | No digital payout |
+
+### Database Schema
+
+`agent_payment_methods` table (schema: `payment`):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | uuid | PK |
+| `AgentId` | uuid | FK to agent/user |
+| `MethodType` | varchar(30) | `Bkash`, `Nagad`, `BankTransfer`, `Card`, `Cash` |
+| `Provider` | varchar(50) | e.g. `Bkash`, `Nagad`, `Dutch Bangla` |
+| `AccountNumber` | varchar(100) | Phone number or account number |
+| `AccountName` | varchar(200) | Display name |
+| `IsDefault` | boolean | Whether this is the default payout method |
+| `IsVerified` | boolean | Whether the provider confirmed ownership |
+| `VerificationToken` | varchar(200) | OTP/token from verification flow |
+| `Metadata` | text | JSON for extra provider-specific data |
+| `CreatedAtUtc` | timestamptz | |
+| `UpdatedAtUtc` | timestamptz | |
+
+Unique constraint on `(AgentId, Provider, AccountNumber)` prevents duplicate registrations.
+
+### Security Considerations
+
+- Never log full account numbers in production — mask them in logs
+- Verify ownership before marking `IsVerified = true`
+- Use HTTPS for all API calls
+- Store bKash/Nagad credentials in secure vault (e.g. AWS Secrets Manager, Azure Key Vault), not in `appsettings.json`
+- Webhook endpoints must validate provider signatures (bKash `WebhookSecret`, Nagad HMAC)
 
 ## Event Catalog
 

@@ -18,6 +18,10 @@ Enterprise-grade payment transaction lifecycle management for the Enterprise Tra
 - Health checks
 - Structured logging with exception diagnostics
 - Query logging
+- Agent/merchant/personal payment method management (bKash, Nagad, bank accounts)
+- Real bKash payment provider integration (sandbox ready)
+- Polly retry, timeout, and circuit breaker for provider resilience
+- Correlation ID propagation across HTTP and provider calls
 
 ## Technology Stack
 
@@ -55,6 +59,13 @@ dotnet run --project src/PaymentService.Api
 | `RabbitMQ:HostName` | localhost | RabbitMQ host |
 | `Jwt:Authority` | http://localhost:5001 | Auth service URL |
 | `Jwt:Audience` | payment-service | JWT audience |
+| `Bkash:AppKey` | | bKash merchant app key |
+| `Bkash:AppSecret` | | bKash merchant app secret |
+| `Bkash:Username` | | bKash merchant username |
+| `Bkash:Password` | | bKash merchant password |
+| `Bkash:BaseUrl` | https://tokenized.sandbox.bka.sh/v1.2.0-beta | bKash API base URL |
+| `Bkash:CallbackUrl` | | Webhook callback URL for bKash |
+| `Bkash:WebhookSecret` | | Webhook signature secret |
 
 ## Testing
 
