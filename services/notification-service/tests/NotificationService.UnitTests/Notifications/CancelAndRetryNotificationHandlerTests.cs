@@ -76,7 +76,6 @@ public class CancelAndRetryNotificationHandlerTests : IDisposable
         var notification = SeedPendingNotification();
         notification.MarkSending(_clock.UtcNow);
         notification.MarkSent(_clock.UtcNow);
-        await _context.SaveChangesAsync();
 
         var handler = new CancelNotificationHandler(_context, _eventPublisher, _clock);
         var result = await handler.Handle(new CancelNotificationCommand(notification.Id, "too late"), CancellationToken.None);

@@ -16,6 +16,8 @@ public sealed class TestNotificationDbContext : DbContext, INotificationDbContex
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Ignore<NotificationService.Domain.Common.DomainEvent>();
+
         modelBuilder.Entity<Notification>(builder =>
         {
             builder.HasMany(n => n.Logs).WithOne().HasForeignKey(l => l.NotificationId);

@@ -82,7 +82,7 @@ public class NotificationTests
         notification.Status.Should().Be(NotificationStatus.Retrying);
         notification.RetryCount.Should().Be(1);
         notification.NextRetryAtUtc.Should().Be(NowUtc.AddMinutes(1)); // 2^(1-1) = 1 minute
-        notification.DomainEvents.Should().ContainSingle(e => e is NotificationFailedDomainEvent { WillRetry: true });
+        notification.DomainEvents.OfType<NotificationFailedDomainEvent>().Should().ContainSingle(e => e.WillRetry);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class NotificationTests
         notification.Status.Should().Be(NotificationStatus.DeadLettered);
         notification.NextRetryAtUtc.Should().BeNull();
         notification.DomainEvents.Should().Contain(e => e is NotificationDeadLetteredDomainEvent);
-        notification.DomainEvents.Should().ContainSingle(e => e is NotificationFailedDomainEvent { WillRetry: false });
+        notification.DomainEvents.OfType<NotificationFailedDomainEvent>().Should().ContainSingle(e => !e.WillRetry);
     }
 
     [Fact]
