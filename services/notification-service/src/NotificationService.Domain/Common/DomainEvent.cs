@@ -1,0 +1,15 @@
+using MediatR;
+
+namespace NotificationService.Domain.Common;
+
+/// <summary>
+/// Marker base for domain events. Implements INotification so the same event
+/// can be dispatched in-process via MediatR AND persisted to the transactional
+/// outbox for reliable, at-least-once delivery to RabbitMQ — identical
+/// contract to BookingService/AuthService (see docs/events).
+/// </summary>
+public abstract record DomainEvent : INotification
+{
+    public Guid EventId { get; } = Guid.NewGuid();
+    public DateTimeOffset OccurredOnUtc { get; } = DateTimeOffset.UtcNow;
+}

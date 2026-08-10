@@ -20,3 +20,8 @@ TestResults/
 # not committed: timestamped, disposable, would pile up in every
 # contributor's history.
 logs/
+
+# Notification Service — never commit real secrets or generated logs
+**/logs/
+**/*firebase*service-account*.json
+**/*serviceAccountKey*.json
