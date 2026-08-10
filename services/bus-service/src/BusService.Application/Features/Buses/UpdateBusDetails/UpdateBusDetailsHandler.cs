@@ -38,16 +38,20 @@ public sealed class UpdateBusDetailsHandler : IRequestHandler<UpdateBusDetailsCo
         foreach (var domainEvent in bus.DomainEvents)
             await _eventPublisher.EnqueueAsync(domainEvent, cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConcurrencyException("The bus was modified by another user. Please refresh and try again.");
+        }
+
         bus.ClearDomainEvents();
 
-        // Invalidate the cache-aside read for this bus rather than update it
-        // in place — simpler and correct, at the cost of one extra DB read
-        // on the next GetBus call, which is an acceptable trade for a
-        // low-frequency admin action like this.
         await _cache.RemoveByPrefixAsync($"bus:{bus.Id}", cancellationToken);
 
         return new BusDto(bus.Id, bus.OperatorId, bus.PlateNumber, bus.BusType.ToString(), bus.TotalSeats, bus.DepotId,
-            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.CreatedAtUtc, bus.UpdatedAtUtc);
+            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.TenantId, bus.CompanyId, bus.OrganizationId, bus.IsDeleted, bus.CreatedAtUtc, bus.UpdatedAtUtc);
     }
 }

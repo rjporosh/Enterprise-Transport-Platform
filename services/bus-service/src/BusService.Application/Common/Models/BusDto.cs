@@ -11,5 +11,9 @@ public sealed record BusDto(
     string? Manufacturer,
     string? Model,
     int? YearOfManufacture,
+    Guid? TenantId,
+    Guid? CompanyId,
+    Guid? OrganizationId,
+    bool IsDeleted,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);

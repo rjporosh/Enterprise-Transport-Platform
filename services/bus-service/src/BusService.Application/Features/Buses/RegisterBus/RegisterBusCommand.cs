@@ -11,4 +11,7 @@ public sealed record RegisterBusCommand(
     Guid DepotId,
     string? Manufacturer,
     string? Model,
-    int? YearOfManufacture) : IRequest<BusDto>;
+    int? YearOfManufacture,
+    Guid? TenantId,
+    Guid? CompanyId,
+    Guid? OrganizationId) : IRequest<BusDto>;

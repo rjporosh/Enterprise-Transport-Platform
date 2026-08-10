@@ -14,13 +14,15 @@ public sealed class RegisterBusHandler : IRequestHandler<RegisterBusCommand, Bus
     private readonly IEventPublisher _eventPublisher;
     private readonly IDateTimeProvider _clock;
     private readonly IBusMetrics _metrics;
+    private readonly ICurrentUser _currentUser;
 
-    public RegisterBusHandler(IBusDbContext context, IEventPublisher eventPublisher, IDateTimeProvider clock, IBusMetrics metrics)
+    public RegisterBusHandler(IBusDbContext context, IEventPublisher eventPublisher, IDateTimeProvider clock, IBusMetrics metrics, ICurrentUser currentUser)
     {
         _context = context;
         _eventPublisher = eventPublisher;
         _clock = clock;
         _metrics = metrics;
+        _currentUser = currentUser;
     }
 
     public async Task<BusDto> Handle(RegisterBusCommand request, CancellationToken cancellationToken)
@@ -37,10 +39,13 @@ public sealed class RegisterBusHandler : IRequestHandler<RegisterBusCommand, Bus
 
         var busType = Enum.Parse<BusType>(request.BusType, ignoreCase: true);
         var now = _clock.UtcNow;
+        var tenantId = _currentUser.TenantId ?? request.TenantId;
+        var companyId = _currentUser.CompanyId ?? request.CompanyId;
+        var organizationId = _currentUser.OrganizationId ?? request.OrganizationId;
 
         var bus = Bus.Register(
             Guid.NewGuid(), request.OperatorId, normalizedPlate, busType, request.TotalSeats, request.DepotId,
-            request.Manufacturer, request.Model, request.YearOfManufacture, now);
+            request.Manufacturer, request.Model, request.YearOfManufacture, tenantId, companyId, organizationId, now);
 
         _context.Buses.Add(bus);
 
@@ -53,9 +58,6 @@ public sealed class RegisterBusHandler : IRequestHandler<RegisterBusCommand, Bus
         }
         catch (DbUpdateException)
         {
-            // Same DB-level race handling as Auth Service's RegisterHandler:
-            // the AnyAsync pre-check above can lose a race under real
-            // concurrency (two requests registering the same plate at once).
             var wonByAnotherRequest = await _context.Buses.AnyAsync(b => b.Id != bus.Id && b.PlateNumber == normalizedPlate, cancellationToken);
             if (!wonByAnotherRequest)
                 throw;
@@ -67,6 +69,6 @@ public sealed class RegisterBusHandler : IRequestHandler<RegisterBusCommand, Bus
         _metrics.RecordBusRegistered();
 
         return new BusDto(bus.Id, bus.OperatorId, bus.PlateNumber, bus.BusType.ToString(), bus.TotalSeats, bus.DepotId,
-            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.CreatedAtUtc, bus.UpdatedAtUtc);
+            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.TenantId, bus.CompanyId, bus.OrganizationId, bus.IsDeleted, bus.CreatedAtUtc, bus.UpdatedAtUtc);
     }
 }

@@ -30,7 +30,7 @@ public sealed class GetBusHandler : IRequestHandler<GetBusQuery, BusDto>
             throw new BusNotFoundException(request.BusId);
 
         var dto = new BusDto(bus.Id, bus.OperatorId, bus.PlateNumber, bus.BusType.ToString(), bus.TotalSeats, bus.DepotId,
-            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.CreatedAtUtc, bus.UpdatedAtUtc);
+            bus.Status.ToString(), bus.Manufacturer, bus.Model, bus.YearOfManufacture, bus.TenantId, bus.CompanyId, bus.OrganizationId, bus.IsDeleted, bus.CreatedAtUtc, bus.UpdatedAtUtc);
 
         await _cache.SetAsync(CacheKey(request.BusId), dto, TimeSpan.FromMinutes(5), cancellationToken);
         return dto;

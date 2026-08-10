@@ -11,8 +11,13 @@ public sealed class GetBusesHandler : IRequestHandler<GetBusesQuery, PagedResult
     private const int MaxPageSize = 200;
 
     private readonly IBusDbContext _context;
+    private readonly ICurrentUser _currentUser;
 
-    public GetBusesHandler(IBusDbContext context) => _context = context;
+    public GetBusesHandler(IBusDbContext context, ICurrentUser currentUser)
+    {
+        _context = context;
+        _currentUser = currentUser;
+    }
 
     public async Task<PagedResult<BusDto>> Handle(GetBusesQuery request, CancellationToken cancellationToken)
     {
@@ -20,6 +25,16 @@ public sealed class GetBusesHandler : IRequestHandler<GetBusesQuery, PagedResult
         var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
 
         var query = _context.Buses.AsQueryable();
+
+        var tenantId = _currentUser.TenantId ?? request.TenantId;
+        if (tenantId.HasValue)
+            query = query.Where(b => b.TenantId == tenantId.Value);
+
+        if (request.CompanyId.HasValue)
+            query = query.Where(b => b.CompanyId == request.CompanyId.Value);
+
+        if (request.OrganizationId.HasValue)
+            query = query.Where(b => b.OrganizationId == request.OrganizationId.Value);
 
         if (request.OperatorId.HasValue)
             query = query.Where(b => b.OperatorId == request.OperatorId.Value);
@@ -37,7 +52,7 @@ public sealed class GetBusesHandler : IRequestHandler<GetBusesQuery, PagedResult
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(b => new BusDto(b.Id, b.OperatorId, b.PlateNumber, b.BusType.ToString(), b.TotalSeats, b.DepotId,
-                b.Status.ToString(), b.Manufacturer, b.Model, b.YearOfManufacture, b.CreatedAtUtc, b.UpdatedAtUtc))
+                b.Status.ToString(), b.Manufacturer, b.Model, b.YearOfManufacture, b.TenantId, b.CompanyId, b.OrganizationId, b.IsDeleted, b.CreatedAtUtc, b.UpdatedAtUtc))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<BusDto>(items, page, pageSize, totalCount);
