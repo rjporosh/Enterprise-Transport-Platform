@@ -18,7 +18,7 @@ narrative summary of it.
 | **Auth Service** | ✅ Built, fixed, verified against a real `dotnet build`/`dotnet run` | Register/login/refresh (rotation + theft detection)/logout, audit trail, multi-provider DB |
 | **Booking Service** | ✅ Built, fixed | Trip search, seat-hold booking, had a regression once (see §5) — currently restored |
 | **Bus Service** | ✅ Built this session, **not yet run against a real compiler** | Fleet/depot management — see §3 |
-| **Route Service** | ❌ Not started | Empty folder (`services/route-service`) |
+| **Route Service** | ✅ Built, fixed, verified against a real `dotnet build` | Routes, stops, schedules — see §3 |
 | **Payment Service** | ❌ Not started | Empty folder (`services/payment-service`) |
 | **Notification Service** | ❌ Not started | Empty folder (`services/notification-service`) |
 | **Angular customer web app** | ✅ Built for demo | Mock/fake API responses — not wired to real backend yet |
@@ -56,6 +56,11 @@ avoiding repeat work.
 **Booking Service**: built, then regressed (a merge in the user's own
 workflow reverted it to a pre-fix state — see §5), then restored + re-fixed
 in this session. Not re-verified against a real build since the restore.
+
+**Route Service**: fully written this session (all four Clean Architecture
+layers + tests + docs + generated EF Core migration), applying every
+lesson from Auth/Booking/Bus's fix history. Build verified; 28 unit tests
+passing. Never run end-to-end (requires Postgres/Redis/RabbitMQ).
 
 **Bus Service**: fully written this session (all four Clean Architecture
 layers + tests + docs + a hand-authored EF Core migration), applying every
@@ -199,15 +204,13 @@ the current branch's ancestry, that's the regression.
    `docs/development/database-migrations.md`). The hand-authored one was
    cross-checked field-by-field but is not a substitute for real
    tool output.
-3. **Route Service** — next service to build, same pattern as Bus
-   Service (copy its structure, adapt namespaces, apply every lesson in
-   §4 from the start). Likely scope: routes (origin/destination, stops),
-   schedules — check `docs/database/Tables.md` and
-   `docs/api/API_Contracts.md` for any existing planning notes on its
-   shape before designing from scratch.
-4. **Payment Service**, then **Notification Service** — same pattern.
-   Notification Service is a dependency for finishing two "known gaps"
-   already flagged in Auth Service (email verification, password reset).
+3. **Payment Service** — next service to build, same pattern as Route
+   Service. Likely scope: payment intents, providers, refunds, webhooks —
+   check `docs/database/Tables.md` and `docs/api/API_Contracts.md` for
+   planning notes.
+4. **Notification Service** — same pattern. Notification Service is a
+   dependency for finishing two "known gaps" already flagged in Auth Service
+   (email verification, password reset).
 5. **Backport the file-based diagnostic logging feature** (§3, "new
    platform-wide feature") to Auth Service and Booking Service — only
    built into Bus Service so far.

@@ -1,0 +1,193 @@
+{
+  "info": {
+    "_postman_id": "route-service-collection",
+    "name": "Route Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Enterprise Transport Platform - Route Service API collection"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "auth_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "path": ["health"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stops",
+      "item": [
+        {
+          "name": "Create Stop",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"code\":\"DHK\",\"name\":\"Dhaka\",\"city\":\"Dhaka\",\"address\":\"Kamalapur\",\"latitude\":23.8103,\"longitude\":90.4125}" },
+            "url": { "raw": "{{base_url}}/api/v1/stops", "path": ["api", "v1", "stops"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stop",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/stops/{{stop_id}}", "path": ["api", "v1", "stops", "{{stop_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Stops",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/stops?city=Dhaka&page=1&pageSize=20", "path": ["api", "v1", "stops"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Stop",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Dhaka Central\",\"city\":\"Dhaka\",\"address\":\"Central\",\"latitude\":23.8103,\"longitude\":90.4125}" },
+            "url": { "raw": "{{base_url}}/api/v1/stops/{{stop_id}}", "path": ["api", "v1", "stops", "{{stop_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Stop",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/stops/{{stop_id}}", "path": ["api", "v1", "stops", "{{stop_id}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Routes",
+      "item": [
+        {
+          "name": "Create Route",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"code\":\"DAC-CTG\",\"name\":\"Dhaka to Chittagong\",\"originStopId\":\"{{stop_dhk}}\",\"destinationStopId\":\"{{stop_ctg}}\",\"transportMode\":\"Bus\",\"distanceKm\":250.0,\"estimatedDuration\":\"06:00:00\"}" },
+            "url": { "raw": "{{base_url}}/api/v1/routes", "path": ["api", "v1", "routes"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/routes/{{route_id}}", "path": ["api", "v1", "routes", "{{route_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Routes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/routes?page=1&pageSize=20", "path": ["api", "v1", "routes"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Route",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Dhaka to Chittagong Express\",\"transportMode\":\"Bus\",\"distanceKm\":260.0,\"estimatedDuration\":\"05:30:00\"}" },
+            "url": { "raw": "{{base_url}}/api/v1/routes/{{route_id}}", "path": ["api", "v1", "routes", "{{route_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Route",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/routes/{{route_id}}?expectedVersion={{version}}", "path": ["api", "v1", "routes", "{{route_id}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Schedules",
+      "item": [
+        {
+          "name": "Create Schedule",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"routeId\":\"{{route_id}}\",\"departureTime\":\"08:00:00\",\"arrivalTime\":\"14:00:00\",\"effectiveFrom\":\"2026-01-01T00:00:00Z\"}" },
+            "url": { "raw": "{{base_url}}/api/v1/schedules", "path": ["api", "v1", "schedules"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/schedules/{{schedule_id}}", "path": ["api", "v1", "schedules", "{{schedule_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Schedules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/schedules?routeId={{route_id}}&page=1&pageSize=20", "path": ["api", "v1", "schedules"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Schedule",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/schedules/{{schedule_id}}/activate", "path": ["api", "v1", "schedules", "{{schedule_id}}", "activate"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend Schedule",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/api/v1/schedules/{{schedule_id}}/suspend", "path": ["api", "v1", "schedules", "{{schedule_id}}", "suspend"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

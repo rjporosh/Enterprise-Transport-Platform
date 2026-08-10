@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option csharp_namespace = "RouteService.Api.Grpc";
+
+package route;
+
+service RouteGrpcService {
+  rpc GetRoute (GetRouteRequest) returns (GetRouteReply);
+  rpc SearchRoutes (SearchRoutesRequest) returns (SearchRoutesReply);
+}
+
+message GetRouteRequest {
+  string route_id = 1;
+}
+
+message GetRouteReply {
+  string route_id = 1;
+  string code = 2;
+  string name = 3;
+  string status = 4;
+  string transport_mode = 5;
+  double distance_km = 6;
+}
+
+message SearchRoutesRequest {
+  string term = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message SearchRoutesReply {
+  repeated RouteItem routes = 1;
+  int32 total_count = 2;
+}
+
+message RouteItem {
+  string route_id = 1;
+  string code = 2;
+  string name = 3;
+  string status = 4;
+  string transport_mode = 5;
+}

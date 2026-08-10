@@ -1,0 +1,122 @@
+{
+  "info": {
+    "name": "Route Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for Route Service API"
+  },
+  "item": [
+    {
+      "name": "Release",
+      "item": [
+        {
+          "name": "Get Release Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/release/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "release", "info"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Routes",
+      "item": [
+        {
+          "name": "Create Route",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"DAC-DHK-CTG\",\n  \"name\": \"Dhaka to Chittagong\",\n  \"originStopId\": \"{{originStopId}}\",\n  \"destinationStopId\": \"{{destinationStopId}}\",\n  \"transportMode\": \"Bus\",\n  \"distanceKm\": 250.0,\n  \"estimatedDuration\": \"06:00:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/routes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "routes"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Routes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/routes?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "routes"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search Routes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/routes/search?term=dhk&page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "routes", "search"],
+              "query": [
+                { "key": "term", "value": "dhk" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stops",
+      "item": [
+        {
+          "name": "Create Stop",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"DHK\",\n  \"name\": \"Dhaka\",\n  \"city\": \"Dhaka\",\n  \"address\": \"Kamalapur\",\n  \"latitude\": 23.8103,\n  \"longitude\": 90.4125\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/stops",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "stops"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5003" },
+    { "key": "adminToken", "value": "" },
+    { "key": "originStopId", "value": "" },
+    { "key": "destinationStopId", "value": "" }
+  ]
+}
