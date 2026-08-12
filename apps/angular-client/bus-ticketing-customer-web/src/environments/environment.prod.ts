@@ -1,8 +1,8 @@
 export const environment = {
   production: true,
   apiBaseUrl: '/api/v1',
-  // Kept true here too so the production build served for demo/interview
-  // purposes also works with no backend deployed. Set to false for a real
-  // production deployment once services are live behind apiBaseUrl.
-  mockApi: true
+  // All backend services are implemented and routed via nginx.conf in the
+  // production container (see infrastructure/docker/docker-compose.yml).
+  // Set back to true for a backend-less demo/interview build.
+  mockApi: false
 };

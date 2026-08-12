@@ -17,22 +17,56 @@ const DEMO_CUSTOMER_ID = '00000000-0000-0000-0000-000000000001';
 const LATENCY_MS = 450;
 
 /**
- * Stands in for every backend this app calls until the real services
- * (auth-service, payment-service — booking-service already exists) are
- * deployed. It intercepts requests by URL/method *before* they leave the
- * browser and resolves them from in-memory fixtures, so `ng serve` gives a
- * fully working, click-through demo with zero backend running.
+ * Full-mock mode (environment.mockApi = true): stands in for every backend
+ * this app calls, resolving requests from in-memory fixtures so `ng serve`
+ * gives a fully working, click-through demo with zero backend running.
+ * Unchanged — still available for a backend-less demo.
  *
- * Toggle off via `environment.mockApi = false` once real services are live
- * — every feature/service in this app already calls HttpClient against the
- * real REST contract, so nothing else changes.
+ * Real mode (environment.mockApi = false, the default now that
+ * auth-service, booking-service, bus-service, payment-service,
+ * route-service and notification-service are all implemented — see
+ * infrastructure/docker/docker-compose.yml): every path below except two
+ * falls through to `next(req)`, i.e. a real HTTP call proxied to the
+ * matching backend (see proxy.conf.json / nginx.conf) — POST /auth/login,
+ * /auth/register, GET /trips/search, POST /bookings, GET /bookings/{id}
+ * and POST /bookings/{id}/cancel all have a real, contract-matching
+ * endpoint now.
+ *
+ * Two surfaces this app calls have no real match anywhere in the platform,
+ * so they keep resolving from the same mock fixtures even in real mode
+ * rather than 404ing:
+ *   - GET /bookings/mine — booking-service has get-by-id and cancel, but
+ *     no "list my bookings" endpoint.
+ *   - POST /payments/{bookingId}/confirm — this method's own doc comment
+ *     (payment.service.ts) already says it "simulates a hosted
+ *     payment-page redirect flow", a placeholder for the real Payment
+ *     Service's actual multi-step create/process/confirm-by-paymentId
+ *     flow, not a 1:1 match to any single real endpoint.
+ * Per "do not create mock APIs or fake data" neither gets an invented
+ * backend; they're left exactly as they already worked before this
+ * change, until a real matching endpoint exists.
  */
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!environment.mockApi || !req.url.startsWith(environment.apiBaseUrl)) {
+  if (!req.url.startsWith(environment.apiBaseUrl)) {
+    return next(req);
+  }
+  const path = req.url.slice(environment.apiBaseUrl.length);
+
+  if (!environment.mockApi) {
+    seedMockBookings(DEMO_CUSTOMER_ID);
+
+    if (path === '/bookings/mine' && req.method === 'GET') {
+      return respond(listMockBookingsForCustomer(DEMO_CUSTOMER_ID));
+    }
+    const payMatch = path.match(/^\/payments\/([^/]+)\/confirm$/);
+    if (payMatch && req.method === 'POST') {
+      const booking = confirmMockBookingPayment(payMatch[1]);
+      return booking ? respond(booking) : respondError(404, 'Booking not found.');
+    }
+
     return next(req);
   }
 
-  const path = req.url.slice(environment.apiBaseUrl.length);
   seedMockBookings(DEMO_CUSTOMER_ID);
 
   // --- Auth -----------------------------------------------------------

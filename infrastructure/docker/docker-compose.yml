@@ -82,6 +82,8 @@ services:
     restart: unless-stopped
     depends_on:
       - booking-service
+      - auth-service
+      - payment-service
     ports:
       - "4200:80"
 
@@ -93,6 +95,9 @@ services:
     restart: unless-stopped
     depends_on:
       - booking-service
+      - auth-service
+      - bus-service
+      - route-service
     ports:
       - "5173:80"
 

@@ -1,3 +1,4 @@
+import axios from 'axios';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { AxiosHeaders } from 'axios';
 import {
@@ -133,3 +134,62 @@ export const mockAdapter: AxiosAdapter = async (config) => {
 
   return fail(config, 404, `No mock handler for ${method} ${path}`);
 };
+
+// A plain axios instance with no custom adapter — used by
+// realBackendWithFallbackAdapter below to make actual HTTP calls. Separate
+// from httpClient itself so this module has no import-cycle on httpClient.ts.
+const realHttp = axios.create({ timeout: 10_000 });
+
+/**
+ * Real mode (VITE_USE_MOCK_API=false): auth-service (/auth/login),
+ * bus-service (/buses) and route-service (/routes) are implemented and
+ * reachable now, as are booking-service's /bookings/{id} (get) and
+ * /bookings/{id}/cancel — those go out over real HTTP to env.apiBaseUrl
+ * (see httpClient.ts's baseURL) exactly as axios would without any
+ * adapter override.
+ *
+ * Three surfaces this console calls have no matching real endpoint
+ * anywhere in the platform, so routing them to a real backend would just
+ * 404 rather than work:
+ *   - GET /dashboard/stats — no dashboard-aggregation endpoint exists.
+ *   - GET /users — no service exposes user management/listing.
+ *   - GET /bookings and GET /trips (the plain, paginated *list* views) —
+ *     booking-service only has get-by-id/cancel for bookings, and
+ *     /trips/search (which needs an origin/destination/date, a different
+ *     shape entirely from this admin list-with-status-filter view), not a
+ *     bare list of either.
+ * Per "do not create mock APIs or fake data" none of those three get an
+ * invented backend; they keep answering from the same mock fixtures used
+ * in full-mock mode above, so those screens keep working rather than
+ * breaking, until real endpoints exist.
+ */
+const realBackendWithFallbackAdapter: AxiosAdapter = async (config) => {
+  const method = (config.method ?? 'get').toUpperCase();
+  const url = new URL(config.url ?? '', 'http://mock.local');
+  const path = url.pathname;
+  const params = { ...Object.fromEntries(url.searchParams.entries()), ...(config.params ?? {}) };
+
+  if (path === '/dashboard/stats' && method === 'GET') {
+    return ok(config, dashboardStats());
+  }
+  if (path === '/users' && method === 'GET') {
+    return ok(config, paginate(MOCK_USERS, Number(params.page ?? 1), Number(params.pageSize ?? 20)));
+  }
+  if (path === '/bookings' && method === 'GET') {
+    const filtered = params.status ? MOCK_BOOKINGS.filter((b) => b.status === params.status) : MOCK_BOOKINGS;
+    return ok(config, paginate(filtered, Number(params.page ?? 1), Number(params.pageSize ?? 20)));
+  }
+  if (path === '/trips' && method === 'GET') {
+    let items = MOCK_TRIPS;
+    if (params.status) items = items.filter((t) => t.status === params.status);
+    if (params.q) items = items.filter((t) => t.routeName.toLowerCase().includes(String(params.q).toLowerCase()));
+    return ok(config, paginate(items, Number(params.page ?? 1), Number(params.pageSize ?? 20)));
+  }
+
+  // Everything else (auth/login, buses, routes, bookings/{id},
+  // bookings/{id}/cancel) has a real backend — make the actual HTTP call.
+  return realHttp.request(config);
+};
+
+export const httpAdapter = (useMock: boolean): AxiosAdapter =>
+  useMock ? mockAdapter : realBackendWithFallbackAdapter;

@@ -42,6 +42,9 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": { "buildTarget": "bus-ticketing-customer-web:build:production" },
             "development": { "buildTarget": "bus-ticketing-customer-web:build:development" }
