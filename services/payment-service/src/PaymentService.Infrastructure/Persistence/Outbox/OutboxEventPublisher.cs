@@ -17,7 +17,7 @@ public class OutboxEventPublisher : IEventPublisher
         _logger = logger;
     }
 
-    public async Task EnqueueAsync(INotification domainEvent, CancellationToken cancellationToken = default)
+    public Task EnqueueAsync(INotification domainEvent, CancellationToken cancellationToken = default)
     {
         var eventType = domainEvent.GetType().AssemblyQualifiedName!;
         var payload = System.Text.Json.JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
@@ -37,5 +37,7 @@ public class OutboxEventPublisher : IEventPublisher
             "Enqueued outbox event {EventType} with ID {OutboxId}",
             eventType,
             outboxMessage.Id);
+
+        return Task.CompletedTask;
     }
 }

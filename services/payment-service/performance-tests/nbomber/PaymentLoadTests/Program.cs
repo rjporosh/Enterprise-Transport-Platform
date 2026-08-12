@@ -8,7 +8,7 @@ namespace PaymentLoadTests;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static void Main(string[] args)
     {
         var baseUrl = args.FirstOrDefault() ?? "http://localhost:5003";
         var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
