@@ -50,6 +50,10 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddSingleton<IBusMetrics, BusMetrics>();
 
+        // JsonLocalizationService caches loaded translation dictionaries via
+        // IMemoryCache — must be registered before it's resolved, or DI
+        // container validation fails at startup (see logs/runtime-error-*.txt).
+        services.AddMemoryCache();
         services.AddSingleton<ILocalizationService, JsonLocalizationService>();
 
         return services;
