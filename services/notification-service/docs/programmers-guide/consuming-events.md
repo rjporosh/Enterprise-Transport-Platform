@@ -10,11 +10,11 @@
 |---|---|---|
 | `auth.user.registered` | `auth.welcome` | Email |
 | `auth.password.changed` | `auth.password-changed` | Email |
-| `auth.user.locked-out` | `auth.account-locked` | Email |
+| `auth.user.locked.out` | `auth.account-locked` | Email |
 | `booking.created` | `booking.held` | Email |
 | `booking.confirmed` | `booking.confirmed` | Email |
 | `booking.cancelled` | `booking.cancelled` | Email |
-| `payment.completed` | `payment.receipt` | Email |
+| `payment.succeeded` | `payment.receipt` | Email |
 | `payment.failed` | `payment.failed` | Email |
 
 ### Recipient Resolution

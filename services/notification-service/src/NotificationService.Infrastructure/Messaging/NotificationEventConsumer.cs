@@ -36,11 +36,11 @@ public sealed class NotificationEventConsumer : BackgroundService
         {
             ["auth.user.registered"] = ("auth.welcome", NotificationChannel.Email),
             ["auth.password.changed"] = ("auth.password-changed", NotificationChannel.Email),
-            ["auth.user.locked-out"] = ("auth.account-locked", NotificationChannel.Email),
+            ["auth.user.locked.out"] = ("auth.account-locked", NotificationChannel.Email),
             ["booking.created"] = ("booking.held", NotificationChannel.Email),
             ["booking.confirmed"] = ("booking.confirmed", NotificationChannel.Email),
             ["booking.cancelled"] = ("booking.cancelled", NotificationChannel.Email),
-            ["payment.completed"] = ("payment.receipt", NotificationChannel.Email),
+            ["payment.succeeded"] = ("payment.receipt", NotificationChannel.Email),
             ["payment.failed"] = ("payment.failed", NotificationChannel.Email),
         };
 

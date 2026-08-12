@@ -1,6 +1,4 @@
-# Local dev/demo stack for the Booking Service and Bus Service vertical slices.
-# Other services in MASTER_SPEC.md (Auth, Payment, ...) are not built yet —
-# see ROADMAP.md — so they aren't wired in here either.
+# Local dev/demo stack for the bus-ticketing platform's backend services.
 #
 # NOTE: not run/verified in the environment that generated this repo (no
 # Docker/network access there). Reviewed by hand for correctness; run
@@ -231,8 +229,8 @@ services:
 
   payment-service:
     build:
-      context: ../../services/payment-service
-      dockerfile: src/PaymentService.Api/Dockerfile
+      context: ../..
+      dockerfile: services/payment-service/src/PaymentService.Api/Dockerfile
     container_name: bus-ticketing-payment-service
     restart: unless-stopped
     depends_on:
@@ -257,8 +255,104 @@ services:
     ports:
       - "5202:8080"
 
+  # --- Auth Service ---
+  # Issues/validates the JWTs every other service here trusts (same
+  # Jwt__SigningKey/Issuer/Audience as booking/bus/payment/notification
+  # above) — without this container running, nothing in the stack can
+  # actually obtain a token.
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth_service
+      POSTGRES_USER: auth_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_svc -d auth_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: services/auth-service/src/AuthService.Api/Dockerfile
+    container_name: bus-ticketing-auth-service
+    restart: unless-stopped
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__AuthDb: "Host=postgres-auth;Port=5432;Database=auth_service;Username=auth_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      Redis__ConnectionString: "redis:6379"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+    ports:
+      - "5203:8080"
+
+  # --- Route Service ---
+  postgres-route:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-route
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: route_service
+      POSTGRES_USER: route_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-route-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U route_svc -d route_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  route-service:
+    build:
+      context: ../..
+      dockerfile: services/route-service/src/RouteService.Api/Dockerfile
+    container_name: bus-ticketing-route-service
+    restart: unless-stopped
+    depends_on:
+      postgres-route:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__RouteDb: "Host=postgres-route;Port=5432;Database=route_service;Username=route_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      Redis__ConnectionString: "redis:6379"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+    ports:
+      - "5204:8080"
+
 volumes:
   postgres-data:
   postgres-notification-data:
   postgres-bus-data:
   postgres-payment-data:
+  postgres-auth-data:
+  postgres-route-data:
