@@ -56,7 +56,16 @@ builder.Services.AddOpenTelemetry()
         tracing
             .AddAspNetCoreInstrumentation(options => options.RecordException = true)
             .AddHttpClientInstrumentation()
-            .AddNpgsql();
+            // Npgsql emits its own ActivitySource named "Npgsql" (see
+            // https://www.npgsql.org/doc/diagnostics/tracing.html). Subscribing
+            // via AddSource is enough to capture it and avoids depending on the
+            // Npgsql.OpenTelemetry package's .AddNpgsql() extension, whose name
+            // collides at this call site with
+            // NpgsqlServiceCollectionExtensions.AddNpgsql<TContext>(IServiceCollection, ...)
+            // from Npgsql.EntityFrameworkCore.PostgreSQL (brought into scope via
+            // the SDK's implicit "Microsoft.Extensions.DependencyInjection" using) —
+            // that collision is what produced CS7036 here.
+            .AddSource("Npgsql");
 
         // Parameterless overload resolves IConnectionMultiplexer from DI at
         // startup (OpenTelemetry.Instrumentation.StackExchangeRedis). If your

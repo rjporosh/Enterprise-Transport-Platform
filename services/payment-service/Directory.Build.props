@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <!--
+      NU1608: Pomelo.EntityFrameworkCore.MySql 9.0.0 declares a dependency constraint on
+      Microsoft.EntityFrameworkCore.Relational >= 9.0.0 && <= 9.0.999, but this solution
+      targets EF Core 10.0.0. Pomelo has not yet published an EF Core 10-compatible release
+      (tracked upstream: https://github.com/PomeloFoundation/Pomelo.EntityFrameworkCore.MySql/issues/2007).
+      The MySQL provider has been verified to still work correctly against EF Core 10 in
+      practice; this is a version-range metadata gap in Pomelo's package, not a real
+      incompatibility. Suppressing centrally here (rather than only on the single
+      PackageReference in PaymentService.Infrastructure.csproj) because NoWarn on one
+      PackageReference item does not propagate to projects that pull the package in
+      transitively via ProjectReference (PaymentService.Api, the test projects) - each of
+      those projects evaluates its own restore graph and re-raises the same warning.
+      Remove this suppression once Pomelo ships an EF Core 10-compatible release.
+    -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
+  </PropertyGroup>
+</Project>

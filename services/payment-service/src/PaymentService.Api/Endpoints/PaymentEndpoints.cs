@@ -22,7 +22,6 @@ public static class PaymentEndpoints
     {
         var group = endpoints.MapGroup("/api/v1/payments")
             .WithTags("Payments")
-            .WithOpenApi()
             .RequireAuthorization()
             .RequireRateLimiting("PaymentPolicy");
 
@@ -140,8 +139,7 @@ public static class PaymentEndpoints
         .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
 
         var searchGroup = endpoints.MapGroup("/api/v1/payments/search")
-            .WithTags("Payments")
-            .WithOpenApi();
+            .WithTags("Payments");
 
         searchGroup.MapGet("/", async (
             [AsParameters] SearchPaymentsQuery query,
@@ -155,8 +153,7 @@ public static class PaymentEndpoints
         .Produces<PagedResult<PaymentDto>>(StatusCodes.Status200OK);
 
         var webhookGroup = endpoints.MapGroup("/api/v1/webhooks")
-            .WithTags("Webhooks")
-            .WithOpenApi();
+            .WithTags("Webhooks");
 
         webhookGroup.MapPost("/{providerName}", async (
             string providerName,

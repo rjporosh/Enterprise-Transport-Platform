@@ -308,7 +308,11 @@ public class NagadPaymentProvider : IPaymentProvider, IDisposable
 
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
-        _cachedSessionId = root.GetProperty("sessionId").GetString();
+        var sessionId = root.GetProperty("sessionId").GetString();
+        if (string.IsNullOrEmpty(sessionId))
+            throw new InvalidOperationException("Nagad session creation response did not contain a valid sessionId");
+
+        _cachedSessionId = sessionId;
         var expiresIn = root.GetProperty("expiresIn").GetInt32();
         _sessionExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn - 60);
 

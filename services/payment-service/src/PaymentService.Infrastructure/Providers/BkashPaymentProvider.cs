@@ -310,7 +310,11 @@ public class BkashPaymentProvider : IPaymentProvider, IDisposable
 
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
-        _cachedToken = root.GetProperty("id_token").GetString();
+        var idToken = root.GetProperty("id_token").GetString();
+        if (string.IsNullOrEmpty(idToken))
+            throw new InvalidOperationException("bKash token grant response did not contain a valid id_token");
+
+        _cachedToken = idToken;
         var expiresIn = root.GetProperty("expires_in").GetInt32();
         _tokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn - 60);
 

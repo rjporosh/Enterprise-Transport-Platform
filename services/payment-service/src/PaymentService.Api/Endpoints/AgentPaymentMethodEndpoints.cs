@@ -13,7 +13,6 @@ public static class AgentPaymentMethodEndpoints
     {
         var group = endpoints.MapGroup("/api/v1/agents/{agentId:guid}/payment-methods")
             .WithTags("AgentPaymentMethods")
-            .WithOpenApi()
             .RequireAuthorization()
             .RequireRateLimiting("PaymentPolicy");
 

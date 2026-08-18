@@ -152,8 +152,12 @@ try
 
     app.UseMiddleware<PaymentService.Api.Middleware.ExceptionHandlingMiddleware>();
 
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // app.MapOpenApi();
+    // app.MapScalarApiReference("/scalar", options =>
+    //      {
+    //          options.WithTitle("Payment Service API")
+    //              .WithTheme(ScalarTheme.Purple);
+    //     });
 
     app.MapPaymentEndpoints();
     app.MapAgentPaymentMethodEndpoints();

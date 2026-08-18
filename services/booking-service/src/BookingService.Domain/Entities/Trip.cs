@@ -20,7 +20,7 @@ public class Trip : AggregateRoot
     public Guid BusId { get; private set; }
     public DateTimeOffset DepartureUtc { get; private set; }
     public DateTimeOffset ArrivalUtc { get; private set; }
-    public Money BasePrice { get; private set; }
+    public Money BasePrice { get; private set; } = default!;
     public TripStatus Status { get; private set; } = TripStatus.Scheduled;
 
     public IReadOnlyCollection<TripSeat> Seats => _seats.AsReadOnly();

@@ -1,0 +1,12 @@
+{
+  "name": "enterprise-transport-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "npm workspaces root. Exists solely so the shared UI libraries (consumed as TypeScript source, no build step) can resolve @angular/core, @angular/forms, react, react-dom etc. from a node_modules directory that is an ANCESTOR of both the library and the consuming app. Without this, apps/shared-ui-library/angular and apps/shared-ui-library/react are siblings of the apps that import them, and Node's module resolution can never walk up to a sibling's node_modules — that mismatch was the root cause of the 'Cannot find module @angular/core' build failure in the Client Portal.",
+  "workspaces": [
+    "apps/angular-client/bus-ticketing-customer-web",
+    "apps/react-admin/bus-ticketing-admin",
+    "apps/shared-ui-library/angular",
+    "apps/shared-ui-library/react"
+  ]
+}

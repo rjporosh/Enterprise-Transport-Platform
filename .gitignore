@@ -3,6 +3,7 @@
 **/obj/
 
 # Node
+**/node_modules/
 **/dist/
 **/build/
 **/.angular/
@@ -25,3 +26,7 @@ logs/
 **/logs/
 **/*firebase*service-account*.json
 **/*serviceAccountKey*.json
+
+# Local Git recovery backup
+.git-corrupted/
+.DS_Store

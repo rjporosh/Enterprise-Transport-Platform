@@ -21,6 +21,11 @@
 
     <!-- Native minimal-API OpenAPI document generation (Microsoft.AspNetCore.OpenApi), served at /openapi/v1.json. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <!-- Pins the transitive Microsoft.OpenApi brought in by Microsoft.AspNetCore.OpenApi 10.0.0
+         (which resolves to 2.0.0) up to the version patched for GHSA-v5pm-xwqc-g5wc /
+         CVE-2026-49451 (stack overflow on circular schema refs). Direct reference wins
+         over the transitive one under NuGet's nearest-wins rule. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <!-- Scalar renders that document as a modern, "click to try" API reference at /scalar. -->
     <PackageReference Include="Scalar.AspNetCore" Version="2.1.2" />
 
@@ -32,7 +37,9 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" Version="1.17.0-beta.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
-    <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.0" />
+    <!-- Npgsql.OpenTelemetry removed: Program.cs now subscribes to Npgsql's "Npgsql"
+         ActivitySource directly via AddSource(), so this package (and its .AddNpgsql()
+         extension, which collided with EFCore.PG's AddNpgsql<TContext>) is no longer needed. -->
   </ItemGroup>
 
   <ItemGroup>

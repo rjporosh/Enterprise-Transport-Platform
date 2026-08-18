@@ -26,7 +26,7 @@
 1. `cd services/route-service`
 2. `dotnet build`
 3. `dotnet run --project src/RouteService.Api`
-4. Open `http://localhost:5003/scalar` in Development
+4. Open `http://localhost:5401/scalar` in Development (port changed 2026-08-16 to resolve a conflict with payment-service, which also used to claim 5003 — see root `AI-HANDOVER.md`)
 
 ## Environment variables / secrets
 - `ConnectionStrings:RouteDb`

@@ -1,0 +1,19 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Rider / VS
+.idea/
+.vs/
+
+## OS
+.DS_Store
+
+## Logs
+*.log
+
+## Local secrets / environment overrides
+appsettings.*.local.json
+.env

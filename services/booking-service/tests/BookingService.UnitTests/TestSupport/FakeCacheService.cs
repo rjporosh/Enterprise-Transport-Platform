@@ -7,12 +7,12 @@ public sealed class FakeCacheService : ICacheService
 {
     private readonly Dictionary<string, object> _store = new();
 
-    public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class =>
-        Task.FromResult(_store.TryGetValue(key, out var value) ? value as T : null);
+    public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_store.TryGetValue(key, out var value) && value is T typed ? typed : default);
 
-    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken cancellationToken = default) where T : class
+    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken cancellationToken = default)
     {
-        _store[key] = value;
+        _store[key] = value!;
         return Task.CompletedTask;
     }
 

@@ -20,7 +20,7 @@ public class Booking : AggregateRoot
     public Guid TripId { get; private set; }
     public Guid CustomerId { get; private set; }
     public BookingStatus Status { get; private set; }
-    public Money TotalAmount { get; private set; }
+    public Money TotalAmount { get; private set; } = default!;
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? ConfirmedAtUtc { get; private set; }
     public DateTimeOffset? CancelledAtUtc { get; private set; }
