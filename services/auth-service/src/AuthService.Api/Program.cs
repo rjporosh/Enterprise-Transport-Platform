@@ -59,6 +59,26 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// ---------- CORS ----------
+// Missing entirely before this fix — booking-service and payment-service
+// both configure this (see their Program.cs) for the same reason: browser
+// clients (Angular customer-web, React admin) need it for any request that
+// doesn't go through the nginx/ng-serve same-origin proxy (direct API
+// testing, mobile/webview clients, a future API gateway). The documented
+// dev/prod frontend flow proxies server-side so it didn't strictly need
+// this to demo register/login, but its absence here was an inconsistency
+// with the rest of the platform and a real gap for any direct browser
+// caller. Origins are configured, not wildcarded, since credentials-style
+// auth endpoints are exactly where AllowAnyOrigin is the wrong default.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowConfiguredOrigins", policy =>
+    {
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+        policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
+    });
+});
+
 // ---------- Rate limiting ----------
 // A stricter policy on the write-heavy auth endpoints (register/login/refresh)
 // than the platform gateway's general limit — these are exactly the
@@ -177,6 +197,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseCors("AllowConfiguredOrigins");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
