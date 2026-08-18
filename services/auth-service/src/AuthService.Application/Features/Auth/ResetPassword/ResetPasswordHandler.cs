@@ -9,14 +9,16 @@ public sealed class ResetPasswordHandler : IRequestHandler<ResetPasswordCommand>
 {
     private readonly IAuthDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ITokenService _tokenService;
     private readonly IPasswordHistoryValidator _passwordHistoryValidator;
     private readonly IAuditLogger _auditLogger;
     private readonly ILogger<ResetPasswordHandler> _logger;
 
-    public ResetPasswordHandler(IAuthDbContext context, IPasswordHasher passwordHasher, IPasswordHistoryValidator passwordHistoryValidator, IAuditLogger auditLogger, ILogger<ResetPasswordHandler> logger)
+    public ResetPasswordHandler(IAuthDbContext context, IPasswordHasher passwordHasher, ITokenService tokenService, IPasswordHistoryValidator passwordHistoryValidator, IAuditLogger auditLogger, ILogger<ResetPasswordHandler> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
+        _tokenService = tokenService;
         _passwordHistoryValidator = passwordHistoryValidator;
         _auditLogger = auditLogger;
         _logger = logger;
@@ -24,7 +26,15 @@ public sealed class ResetPasswordHandler : IRequestHandler<ResetPasswordCommand>
 
     public async Task Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
-        var tokenHash = _passwordHasher.Hash(request.Token);
+        // BUG FIX: the raw reset token is hashed with ITokenService.HashRefreshToken
+        // (deterministic SHA-256) when it's issued in ForgotPasswordHandler and
+        // stored on PasswordResetToken.TokenHash. This was looking it up with
+        // IPasswordHasher.Hash instead, which is PBKDF2 with a fresh random salt
+        // per call (by design, for user password storage) — so tokenHash here
+        // never equaled the stored value and every reset-password request failed
+        // with InvalidResetTokenException, for every user, 100% of the time.
+        // Use the same hashing method that produced the stored hash.
+        var tokenHash = _tokenService.HashRefreshToken(request.Token);
         var now = DateTimeOffset.UtcNow;
 
         var resetToken = await _context.PasswordResetTokens
