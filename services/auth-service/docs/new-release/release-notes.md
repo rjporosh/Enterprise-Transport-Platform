@@ -3,8 +3,9 @@
 This mirrors what `GET /api/v1/auth/release-info` now reports — that
 handler's `BugFixes`, `ChangedFeatures`, and `ConfigurationChanges` lists
 were updated in the same commit as the fixes below so the SQA-facing API
-and this file stay in sync. A copy of this file also lives at
-`docs/new-release/release-notes.md`.
+and this file stay in sync. (A copy of this file also lives at
+`services/auth-service/release-notes.md`, matching the convention used by
+`booking-service`.)
 
 ## Summary
 Investigated "can't register/login" report and a browser console error from

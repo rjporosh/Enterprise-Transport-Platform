@@ -24,7 +24,29 @@ confirmed-green build. The previous agent session (see git log —
    resume state if I ran out of budget (I did, once, mid-session — see
    "Session history" below).
 
-## Session history (this ran across two turns)
+## Session history (now three turns)
+**Turn 3:** User reported "nothing fixed nothing touched" and asked again
+for the same fix plus updates in `docs/new-release/release-notes.md`
+specifically (mirroring the pattern seen in `route-service`/`payment-service`,
+where `GET /api/v1/auth/release-info` — already implemented in this
+service, see `GetReleaseInfoHandler.cs` — is the SQA-facing source of
+truth). Verified via `git log` that turns 1–2's three commits
+(`563e4226`, `64408341`, `7582c69b`) were never lost — they're present in
+this working copy and in the delivered zip's `.git` history (confirmed by
+re-extracting and running `git fsck` on it before delivery). Nothing was
+actually un-fixed. What was missing: the *live* SQA release-info API
+response (`GetReleaseInfoHandler.cs`) still had empty `BugFixes` /
+`ChangedFeatures` lists — the fix existed in code but wasn't reflected
+in the data that endpoint reports. Fixed that in this turn, and added
+`docs/new-release/release-notes.md` at the exact path requested (a copy
+of the existing root `release-notes.md`, kept in sync).
+
+**If you're re-reading this because you think nothing was done: check
+`git log --oneline -- services/auth-service` in the delivered zip.** You
+should see commits `563e4226`, `64408341`, `7582c69b`, and this turn's
+follow-up commits, in that repo's history, not just described in prose.
+
+## Session history (turns 1–2)
 **Turn 1:** Extracted the zip, confirmed no dotnet/network, read
 Program.cs, DI (Application + Infrastructure), AuthEndpoints.cs,
 RegisterHandler, LoginHandler, RefreshTokenHandler, LogoutHandler,
