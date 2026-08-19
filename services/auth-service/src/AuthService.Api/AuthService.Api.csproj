@@ -6,6 +6,14 @@
     <Nullable>enable</Nullable>
     <RootNamespace>AuthService.Api</RootNamespace>
     <UserSecretsId>auth-service-4f1c9c2a</UserSecretsId>
+    <!--
+      NU1608: reported here even though this project never references Pomelo
+      directly — it's a transitive restore diagnostic via the ProjectReference
+      to AuthService.Infrastructure. See the matching, fully-explained
+      suppression + Pomelo PackageReference comment in
+      AuthService.Infrastructure.csproj for the actual rationale.
+    -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +28,20 @@
 </PackageReference>
     <!-- Native minimal-API OpenAPI document generation, served at /openapi/v1.json — see Program.cs for why Swashbuckle isn't used alongside it. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <!--
+      Microsoft.AspNetCore.OpenApi 10.0.0 transitively pulls in
+      Microsoft.OpenApi 2.0.0, which has a known high-severity DoS advisory
+      (GHSA-v5pm-xwqc-g5wc / CVE-2026-49451 — a circular schema reference
+      can crash the process via stack overflow while parsing an OpenAPI
+      document). Fixed in 2.7.5 for the 2.x line. Pinned directly here to
+      override the transitive version — NuGet resolves the highest version
+      requested across the graph. Not bumped to the 3.x line since that's a
+      breaking major version change for a package this project doesn't
+      reference directly; re-verify with the .NET CLI's package vulnerability check
+      once network access is available, since this was not restored/tested
+      in this pass.
+    -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <!-- Scalar renders that document as a modern, "click to try" API reference at /scalar. -->
     <PackageReference Include="Scalar.AspNetCore" Version="2.1.2" />
 

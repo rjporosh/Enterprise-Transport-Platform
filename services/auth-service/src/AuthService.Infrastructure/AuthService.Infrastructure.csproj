@@ -5,6 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AuthService.Infrastructure</RootNamespace>
+    <!--
+      NU1608: Pomelo.EntityFrameworkCore.MySql 9.0.0's declared dependency
+      constraint (Microsoft.EntityFrameworkCore.Relational 9.x) doesn't cover
+      the 10.0.0 resolved here. See the PackageReference comment below for
+      why this is a deliberate, tracked suppression rather than a real bug.
+      Suppressed at the project level (not just via the PackageReference's
+      own NoWarn) because NU1608 is a whole-graph restore diagnostic that
+      NuGet also reports against AuthService.Api.csproj, which references
+      this project but never references Pomelo directly — an item-level
+      NoWarn on the Pomelo reference here doesn't reach that project.
+    -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -49,12 +61,19 @@
     <!--
       Transitive dependency (pulled in by Microsoft.EntityFrameworkCore.SqlServer
       -> Microsoft.Data.SqlClient, for Always Encrypted XML key-store support)
-      resolves to a version with known DoS advisories (GHSA-23rf-6693-g89p and
-      others). Pinned directly to a patched version to override it — NuGet
-      resolves the highest version requested across the graph, so this wins
-      over whatever Microsoft.Data.SqlClient asks for.
+      resolves to a version with known DoS advisories. Pinned directly to a
+      patched version to override it — NuGet resolves the highest version
+      requested across the graph, so this wins over whatever
+      Microsoft.Data.SqlClient asks for.
+      10.0.6 carried four open advisories (GHSA-23rf-6693-g89p, GHSA-8q5v-6pqq-x66h,
+      GHSA-cvvh-rhrc-wg4q, GHSA-g8r8-53c2-pm3f, GHSA-mmjf-rqrv-855v — the .NET
+      July 2026 EncryptedXml DoS advisory, CVE-2026-50648, published across the
+      8.0/9.0/10.0 lines). Fixed in 10.0.10 (verified against the advisory's
+      published patched-version range: >=10.0.0,<=10.0.9 vulnerable). Bumped
+      here; re-verify with the .NET CLI's package vulnerability check once network
+      access is available, since this was not restored/tested in this pass.
     -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
 
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
