@@ -24,6 +24,88 @@ confirmed-green build. The previous agent session (see git log —
    resume state if I ran out of budget (I did, once, mid-session — see
    "Session history" below).
 
+## Turn 4 (most recent) — actual build warnings fixed, using real build output
+The user ran the real build on their machine and pasted the actual log —
+first time this session had real compiler output instead of static
+reading. `git status` on their end showed "nothing to commit, working
+tree clean," confirming turns 1–3's commits were present and intact
+(their "nothing fixed nothing touched" was about warning count, not about
+commits going missing — the build genuinely still had all 8 restore
+warnings + 1 CS0618 build warning at that point, because turns 1–3 fixed
+two real *logic/config* bugs but hadn't yet touched the NuGet
+warnings/vulnerabilities the user's original ask also covered).
+
+**Pasted build output, verbatim summary:**
+```
+Restore succeeded with 8 warning(s)
+  - NU1608 x2 (Infrastructure.csproj, Api.csproj): Pomelo.EntityFrameworkCore.MySql
+    9.0.0 vs Microsoft.EntityFrameworkCore.Relational 10.0.0
+  - NU1903 x1 (Api.csproj): Microsoft.OpenApi 2.0.0, GHSA-v5pm-xwqc-g5wc
+  - NU1903 x4 (Infrastructure.csproj): System.Security.Cryptography.Xml 10.0.6,
+    GHSA-23rf-6693-g89p / GHSA-8q5v-6pqq-x66h / GHSA-cvvh-rhrc-wg4q /
+    GHSA-g8r8-53c2-pm3f / GHSA-mmjf-rqrv-855v
+Build succeeded with 17 warning(s) total, including:
+  - CS0618 (DependencyInjection.cs:60): UseMicrosoftDependencyInjectionJobFactory
+    is obsolete
+```
+
+**Fixed, all four warning sources:**
+1. **CS0618** — removed the obsolete Quartz call entirely (it's already
+   the default behavior; zero functional change).
+   `src/AuthService.Infrastructure/DependencyInjection.cs`
+2. **NU1608** — was already suppressed via `NoWarn="NU1608"` on the
+   Pomelo `PackageReference` itself, but that item-level suppression
+   never reached `AuthService.Api.csproj` (which shows the same warning
+   because it references Infrastructure, but doesn't reference Pomelo
+   directly — NU1608 is a whole-graph restore diagnostic, and item-level
+   `NoWarn` doesn't propagate across a `ProjectReference`). Moved the
+   suppression to `<NoWarn>$(NoWarn);NU1608</NoWarn>` in the
+   `PropertyGroup` of **both** `.csproj` files. This is a real,
+   pre-existing upstream gap (Pomelo hasn't shipped an EF Core 10
+   release), not something I fixed by changing behavior — I only made
+   the suppression actually work everywhere the warning fires.
+3. **NU1903, Microsoft.OpenApi 2.0.0** — searched the advisory
+   (GHSA-v5pm-xwqc-g5wc / CVE-2026-49451, high severity, DoS via
+   circular-schema-reference stack overflow while parsing an OpenAPI
+   document). Patched in 2.7.5 for the 2.x line. It's a *transitive*
+   dependency — `Microsoft.AspNetCore.OpenApi 10.0.0` pulls it in — so
+   added a direct `<PackageReference Include="Microsoft.OpenApi"
+   Version="2.7.5" />` in `AuthService.Api.csproj` to override it (NuGet
+   resolves the highest version requested anywhere in the graph).
+4. **NU1903 x4, System.Security.Cryptography.Xml 10.0.6** — one advisory
+   (GHSA-23rf-6693-g89p / CVE-2026-50648, the .NET July 2026
+   EncryptedXml DoS advisory affecting .NET 8/9/10) reported under 4
+   different GHSA IDs by NuGet's audit source. Vulnerable range per the
+   advisory: `>=10.0.0,<=10.0.9`. Patched: `10.0.10`. Bumped the existing
+   direct pin in `AuthService.Infrastructure.csproj` from `10.0.6` to
+   `10.0.10`.
+
+All four package-version/advisory claims above were verified via live
+web search this turn (not from training-data memory, which would be
+unreliable for versions/advisories this recent) — see the in-code
+comments for the exact reasoning kept next to each `PackageReference`.
+
+**Still not compiler-verified.** I still have no `dotnet`/network in this
+sandbox. These are well-reasoned, source-verified version bumps and a
+straightforward NoWarn propagation fix — not guesses — but they have not
+been through an actual `dotnet restore`/`dotnet build` by me. **This is
+the single most important next step**, see "Next command" below.
+
+Also synced `GetReleaseInfoHandler.cs`'s `ChangedFeatures` list with
+these fixes, same rationale as the turn-3 sync (that endpoint is the
+live SQA source of truth per this platform's convention).
+
+### Exact next command (for you, right now, since you have a working `dotnet`)
+```bash
+cd services/auth-service/src/AuthService.Api
+dotnet restore
+dotnet build
+```
+Expected: 0 warnings from NU1608/NU1903/CS0618. If you see anything else,
+that's real signal my static-reasoning fixes above didn't fully close —
+paste it back and I'll fix it directly against real compiler output
+instead of package-advisory research.
+
 ## Session history (now three turns)
 **Turn 3:** User reported "nothing fixed nothing touched" and asked again
 for the same fix plus updates in `docs/new-release/release-notes.md`

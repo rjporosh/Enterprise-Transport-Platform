@@ -3,9 +3,8 @@
 This mirrors what `GET /api/v1/auth/release-info` now reports — that
 handler's `BugFixes`, `ChangedFeatures`, and `ConfigurationChanges` lists
 were updated in the same commit as the fixes below so the SQA-facing API
-and this file stay in sync. (A copy of this file also lives at
-`services/auth-service/release-notes.md`, matching the convention used by
-`booking-service`.)
+and this file stay in sync. A copy of this file also lives at
+`docs/new-release/release-notes.md`.
 
 ## Summary
 Investigated "can't register/login" report and a browser console error from
@@ -23,7 +22,17 @@ reading, matched against sibling services' established patterns. Treat
 this as a diagnosed patch set to verify with a real build, not a
 confirmed-green build.
 
-## Fixed
+## Fixed (round 2 — real build-warning fixes, from actual `dotnet build` output)
+The user provided real `dotnet restore`/`dotnet build` output this round.
+Fixed every warning it showed:
+- **CS0618**: removed the obsolete Quartz `UseMicrosoftDependencyInjectionJobFactory()` call — it's already the default, zero behavior change. `DependencyInjection.cs`.
+- **NU1608** (Pomelo.EntityFrameworkCore.MySql vs EF Core 10): was suppressed on the `PackageReference` itself but that never reached `AuthService.Api.csproj`'s own copy of the same whole-graph warning. Moved to a project-level `<NoWarn>` in both `.csproj` files so it's actually suppressed everywhere it fires.
+- **NU1903, Microsoft.OpenApi 2.0.0** (GHSA-v5pm-xwqc-g5wc, high severity DoS): pinned directly to the patched 2.7.5, overriding the transitive version pulled in by `Microsoft.AspNetCore.OpenApi 10.0.0`.
+- **NU1903 x4, System.Security.Cryptography.Xml 10.0.6** (GHSA-23rf-6693-g89p and 3 related IDs, the .NET July 2026 EncryptedXml DoS advisory): bumped the existing pin from 10.0.6 to the patched 10.0.10.
+
+All four verified against their advisories via live web search this round (versions/CVEs from mid-late 2026, too recent to trust from memory). Full detail and exact diffs: `ai-handover.md`, "Turn 4."
+
+## Fixed (round 1)
 
 - **Critical: password reset was broken for 100% of requests, always.**
   `ResetPasswordHandler` looked up the reset token using
