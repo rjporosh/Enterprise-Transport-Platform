@@ -46,8 +46,14 @@ public sealed class GetReleaseInfoHandler : MediatR.IRequestHandler<GetReleaseIn
                 "Structured logging with Serilog",
                 "Health checks (liveness, readiness, database, Redis, RabbitMQ)"
             },
-            ChangedFeatures: new List<string>(),
-            BugFixes: new List<string>(),
+            ChangedFeatures: new List<string>
+            {
+                "CORS policy added (AllowConfiguredOrigins, reads Cors:AllowedOrigins) to match booking-service and payment-service"
+            },
+            BugFixes: new List<string>
+            {
+                "Reset-password token lookup used IPasswordHasher.Hash() (PBKDF2, random salt per call) instead of the deterministic ITokenService.HashRefreshToken() used to store the token, so every /auth/reset-password call failed with InvalidResetTokenException regardless of a valid token. Fixed to hash the lookup the same way it was stored."
+            },
             ApiChanges: new List<string>
             {
                 "POST /api/v1/auth/register",
@@ -88,7 +94,8 @@ public sealed class GetReleaseInfoHandler : MediatR.IRequestHandler<GetReleaseIn
                 "Jwt:SigningKey must be set to a strong secret in production",
                 "Database:Provider can be Postgres, SqlServer, or MySql",
                 "RabbitMq:HostName, Port, UserName, Password for event publishing",
-                "Redis:ConnectionString for caching and token denylist"
+                "Redis:ConnectionString for caching and token denylist",
+                "Cors:AllowedOrigins (string array) — new, defaults to http://localhost:4200 and http://localhost:5173 in appsettings.json"
             },
             TestingNotes: "Unit tests cover login, lockout, OTP, security questions (case-insensitive and whitespace normalization), password history, and admin CRUD. Integration tests require Docker (Postgres, RabbitMQ, Redis).",
             BreakingChanges: new List<string>(),
