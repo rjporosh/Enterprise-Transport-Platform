@@ -57,7 +57,11 @@ public static class DependencyInjection
 
         services.AddQuartz(q =>
         {
-            q.UseMicrosoftDependencyInjectionJobFactory();
+            // UseMicrosoftDependencyInjectionJobFactory() removed: obsolete
+            // (CS0618) as of Quartz 3.x — MicrosoftDependencyInjectionJobFactory
+            // is already the default job factory when Quartz is registered via
+            // AddQuartz/DI, so this call was a no-op kept from an older Quartz
+            // API. Removing it changes nothing at runtime.
             var jobKey = new JobKey(nameof(OtpCleanupJob));
             q.AddJob<OtpCleanupJob>(opts => opts.WithIdentity(jobKey));
             q.AddTrigger(opts => opts
