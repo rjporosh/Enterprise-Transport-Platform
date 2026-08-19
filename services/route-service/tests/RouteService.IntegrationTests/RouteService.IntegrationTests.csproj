@@ -5,6 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>RouteService.IntegrationTests</RootNamespace>
+    <!--
+      NU1608: transitive restore diagnostic via the ProjectReference to
+      RouteService.Api -> RouteService.Infrastructure. See
+      RouteService.Infrastructure.csproj for the full rationale
+      (Pomelo.EntityFrameworkCore.MySql 9.0.0 vs EF Core 10.0.0).
+    -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
