@@ -1,0 +1,1012 @@
+{
+  "info": {
+    "_postman_id": "86b85597-f56a-4555-a850-e51a10eb277d",
+    "name": "Payment Service API",
+    "description": "Enterprise Transport Platform \u2014 Payment Service. Auto-authenticates against auth-service via a collection-level pre-request script (see Auth folder + collection Pre-request Script tab), then exercises the full payment lifecycle, agent payment methods, provider webhooks, and health probes. Run order for a clean environment: Auth > Login, then Payments > Create Payment > Process Payment > Confirm Payment > Refund Payment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request script.",
+          "// Ensures every request in this collection carries a fresh, valid",
+          "// bus-ticketing-api JWT issued by auth-service, without requiring the",
+          "// developer to manually run the Login request first or refresh it by hand.",
+          "//",
+          "// Skipped entirely for the \"Webhooks\" folder (providers like bKash/Nagad/",
+          "// Stripe cannot present a platform JWT \u2014 those endpoints are protected by",
+          "// provider signature verification instead, see PaymentEndpoints.cs).",
+          "const skipAuthFolders = [\"Webhooks\"];",
+          "const folderName = pm.execution.location && pm.execution.location.length > 1",
+          "    ? pm.execution.location[pm.execution.location.length - 2]",
+          "    : \"\";",
+          "",
+          "if (skipAuthFolders.indexOf(folderName) !== -1) {",
+          "    return;",
+          "}",
+          "",
+          "const expiresAt = pm.environment.get(\"token_expires_at\");",
+          "const hasToken = !!pm.environment.get(\"access_token\");",
+          "const isExpired = !expiresAt || new Date(expiresAt).getTime() <= Date.now() + 5000;",
+          "",
+          "if (hasToken && !isExpired) {",
+          "    return; // current token is still valid, nothing to do",
+          "}",
+          "",
+          "const loginRequest = {",
+          "    url: pm.environment.get(\"auth_base_url\") + \"/api/v1/auth/login\",",
+          "    method: \"POST\",",
+          "    header: { \"Content-Type\": \"application/json\" },",
+          "    body: {",
+          "        mode: \"raw\",",
+          "        raw: JSON.stringify({",
+          "            email: pm.environment.get(\"login_email\"),",
+          "            password: pm.environment.get(\"login_password\")",
+          "        })",
+          "    }",
+          "};",
+          "",
+          "pm.sendRequest(loginRequest, (err, res) => {",
+          "    if (err) {",
+          "        console.error(\"Auto-login pre-request failed to reach auth-service:\", err);",
+          "        return;",
+          "    }",
+          "    if (res.code !== 200) {",
+          "        console.error(\"Auto-login pre-request got non-200 from auth-service:\", res.code, res.text());",
+          "        return;",
+          "    }",
+          "    const body = res.json();",
+          "    pm.environment.set(\"access_token\", body.accessToken);",
+          "    pm.environment.set(\"refresh_token\", body.refreshToken);",
+          "    pm.environment.set(\"token_expires_at\", body.accessTokenExpiresAtUtc);",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test script: runs after every request in this collection.",
+          "pm.test(\"Status code is not a 5xx server error\", function () {",
+          "    pm.expect(pm.response.code).to.be.below(500);",
+          "});",
+          "",
+          "pm.test(\"Response time is acceptable (< 3000ms)\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(3000);",
+          "});",
+          "",
+          "if (pm.response.code === 401) {",
+          "    console.warn(\"401 from \" + pm.request.url + \" \u2014 token may be stale/misconfigured. \" +",
+          "        \"Check Jwt:Issuer/Jwt:Audience/Jwt:SigningKey match between auth-service and payment-service appsettings.json.\");",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "payment_base_url",
+      "value": "http://localhost:5003",
+      "type": "string"
+    },
+    {
+      "key": "auth_base_url",
+      "value": "http://localhost:5101",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (auth-service)",
+      "description": "Reference calls against auth-service, kept here so a developer can obtain/inspect a token manually. The collection's pre-request script normally does this automatically for every Payments/AgentPaymentMethods call.",
+      "item": [
+        {
+          "name": "Login (get JWT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{auth_base_url}}/api/v1/auth/login",
+              "host": [
+                "{{auth_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Issues an access/refresh token pair. Verified contract: TokenPairResponse { accessToken, accessTokenExpiresAtUtc, refreshToken, refreshTokenExpiresAtUtc, userId, email, roles[] } from AuthEndpoints.cs.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\",\n  \"password\": \"{{login_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login succeeded\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(\"access_token\", body.accessToken);",
+                  "pm.environment.set(\"refresh_token\", body.refreshToken);",
+                  "pm.environment.set(\"token_expires_at\", body.accessTokenExpiresAtUtc);",
+                  "pm.test(\"Response contains an access token\", function () { pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "description": "Core payment lifecycle: create -> process -> confirm/fail -> (optional) cancel/refund. All routes require a Bearer token and are subject to the PaymentPolicy rate limiter (100 req/min per authenticated user, fixed window, no queueing) configured in Program.cs.",
+      "item": [
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "PaymentMethodType enum values: Card, BankTransfer, MobileWallet, Cash, Bkash, Nagad, Unknown. idempotencyKey must be unique per attempt \u2014 set a fresh GUID before running if you re-run this request (see pre-request script on this item).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"companyId\": null,\n  \"organizationId\": null,\n  \"customerId\": \"{{customer_id}}\",\n  \"orderReference\": \"ORD-2026-000123\",\n  \"paymentMethod\": \"Bkash\",\n  \"amount\": 1250.5,\n  \"currency\": \"BDT\",\n  \"idempotencyKey\": \"{{idempotency_key}}\",\n  \"feeAmount\": 12.5,\n  \"taxAmount\": 0,\n  \"metadata\": \"{\\\"bookingId\\\":\\\"BK-2026-000123\\\"}\",\n  \"ttlMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"idempotency_key\", \"idem-\" + Date.now() + \"-\" + Math.floor(Math.random() * 100000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(\"payment_id\", body.paymentId);",
+                  "pm.test(\"Response has paymentId and status\", function () {",
+                  "    pm.expect(body.paymentId).to.be.a(\"string\");",
+                  "    pm.expect(body.status).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Payment By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "Returns the full PaymentDto, including computed fields totalRefundedAmount/availableRefundAmount/isRefundable."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment found\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"PaymentDto shape is correct\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.include.keys([\"id\", \"status\", \"amount\", \"currency\", \"isRefundable\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Payments (paged)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments?tenantId={{tenant_id}}&page=1&pageSize=20",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Filters: tenantId (required), customerId (optional), status (optional PaymentStatus enum). Returns PagedResult<PaymentDto>."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"List returned\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"PagedResult shape\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.include.keys([\"items\", \"totalCount\", \"page\", \"pageSize\"]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}/process",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "process"
+              ]
+            },
+            "description": "Hands the payment to the configured provider (Bkash/Nagad/Stripe based on paymentMethod). Requires the payment to be in a processable status (see docs/programmers-guide/adr/0001-payment-state-machine.md).",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment processed\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}/confirm",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "confirm"
+              ]
+            },
+            "description": "Marks the payment Completed once the provider confirms the transaction. In production this is normally driven by the Webhooks endpoint, not called directly \u2014 this request exists for manual/staging verification.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerTransactionId\": \"BKS-TXN-9988776655\",\n  \"providerReference\": \"bkash-ref-2026-001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment confirmed\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fail Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}/fail",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "fail"
+              ]
+            },
+            "description": "Terminal failure transition. Use a different payment_id than the one you intend to Confirm/Refund in the same run \u2014 a payment cannot be both.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Provider declined the transaction.\",\n  \"failureCode\": \"PROVIDER_DECLINED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment marked failed\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}/cancel",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "cancel"
+              ]
+            },
+            "description": "Only valid while the payment is still Pending/Initiated (pre-provider-confirmation). See the state machine ADR for the full transition table.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer cancelled the booking before payment completion.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment cancelled\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/{{payment_id}}/refund",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "refund"
+              ]
+            },
+            "description": "Requires the payment to be Completed and availableRefundAmount >= amount. Amount may be less than the full payment (partial refund) \u2014 repeat calls accumulate against totalRefundedAmount.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500.0,\n  \"reason\": \"Partial refund \\u2014 customer downgraded seat class.\",\n  \"initiatedByUserId\": \"{{customer_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Refund accepted\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(\"refund_id\", body.refundId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/payments/search?tenantId={{tenant_id}}&status=Completed&page=1&pageSize=20",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "Completed"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Now requires Bearer auth + PaymentPolicy rate limiting (fixed in this pass \u2014 the endpoint group was previously missing .RequireAuthorization(), see release-notes.md). Extra filters available: customerId, orderReference, providerReference, fromDate, toDate."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Search returned (auth now enforced)\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Agent Payment Methods",
+      "description": "Agents (ticket-selling partners) register the payout methods they collect fares into. All routes require auth + PaymentPolicy rate limiting.",
+      "item": [
+        {
+          "name": "Add Agent Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/agents/{{agent_id}}/payment-methods",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "payment-methods"
+              ]
+            },
+            "description": "Unique per (agentId, provider, accountNumber) \u2014 see IX_agent_payment_methods_AgentId_Provider_AccountNumber unique index.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agentId\": \"{{agent_id}}\",\n  \"methodType\": \"Bkash\",\n  \"provider\": \"bKash\",\n  \"accountNumber\": \"01711000000\",\n  \"accountName\": \"Karim Transport Agency\",\n  \"metadata\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Payment method added\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.environment.set(\"payment_method_id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Agent Payment Methods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/agents/{{agent_id}}/payment-methods?page=1&pageSize=20",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "payment-methods"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Optional onlyVerified=true filter."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"List returned\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Default Payment Method",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/agents/{{agent_id}}/payment-methods/default",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "payment-methods",
+                "default"
+              ]
+            },
+            "description": "200 with the default method, or 404 if the agent has not set one yet."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 or 404 (both valid)\", function () {",
+                  "    pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Agent Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/agents/{{agent_id}}/payment-methods/{{payment_method_id}}/verify",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "payment-methods",
+                "{{payment_method_id}}",
+                "verify"
+              ]
+            },
+            "description": "Run this before Set Default in a fresh environment if verification is enforced as a precondition \u2014 check VerifyAgentPaymentMethodHandler for the exact rule.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethodId\": \"{{payment_method_id}}\",\n  \"verificationToken\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Verification processed\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Default Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/agents/{{agent_id}}/payment-methods/{{payment_method_id}}/set-default",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "payment-methods",
+                "{{payment_method_id}}",
+                "set-default"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Set as default\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "description": "Provider -> platform callbacks. Deliberately NOT authenticated with a platform JWT (providers cannot obtain one) \u2014 protected instead by the X-Bkash-Signature / X-Nagad-Signature / Stripe-Signature header, verified server-side against each provider's shared secret. This folder is excluded from the collection's auto-login pre-request script.",
+      "item": [
+        {
+          "name": "bKash Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Bkash-Signature",
+                "value": "{{$randomUUID}}",
+                "description": "Replace with a real HMAC signature computed with the bKash shared secret before sending to a live environment \u2014 this placeholder will be rejected by real signature verification."
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/api/v1/webhooks/bkash",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "bkash"
+              ]
+            },
+            "description": "providerName in the URL path is matched by ProcessWebhookCommand \u2014 /webhooks/{providerName}. Also test with 'nagad' and 'stripe' by changing the path segment and the corresponding signature header.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerName\": \"bkash\",\n  \"eventType\": \"payment.completed\",\n  \"eventId\": \"evt-bkash-2026-0099\",\n  \"payload\": \"{\\\"trxID\\\":\\\"BKS-TXN-9988776655\\\",\\\"amount\\\":\\\"1250.50\\\",\\\"paymentID\\\":\\\"TR0011zzYY\\\"}\",\n  \"signature\": \"\",\n  \"timestamp\": \"2026-08-19T10:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Webhook accepted for processing\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "description": "Liveness/readiness probes \u2014 no auth required, not subject to PaymentPolicy.",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/health/live",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Alive\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{payment_base_url}}/health/ready",
+              "host": [
+                "{{payment_base_url}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Ready (Postgres + Redis + RabbitMQ)\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
