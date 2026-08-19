@@ -75,7 +75,35 @@ try
         });
     });
 
-    builder.Services.AddOpenApi("v1");
+    // ---------- OpenAPI / Scalar ----------
+    // Native Microsoft.AspNetCore.OpenApi + Scalar, matching Auth/Booking/Bus/
+    // Route/Notification services (Swashbuckle is deliberately not used — see
+    // those services' Program.cs for the .NET 10 OpenAPI.NET v1/v2 shape
+    // mismatch that made Scalar silently show zero operations under Swashbuckle).
+    builder.Services.AddOpenApi("v1", options =>
+    {
+        options.AddDocumentTransformer((document, context, cancellationToken) =>
+        {
+            document.Info.Title = "Payment Service API";
+            document.Info.Version = "v1";
+            document.Info.Description =
+                "Payment intake, provider processing (bKash/Nagad/Stripe), confirmation, " +
+                "cancellation, refunds, agent payment-method management, and provider " +
+                "webhook ingestion for the Enterprise Transport Platform.";
+
+            document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
+            document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
+            document.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.OpenApiSecurityScheme
+            {
+                Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "Paste the access token returned by auth-service's /api/v1/auth/login or /register."
+            };
+
+            return Task.CompletedTask;
+        });
+    });
 
     var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
     var healthChecks = builder.Services.AddHealthChecks();
@@ -130,7 +158,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        app.MapOpenApi();
+        app.MapOpenApi();                          // -> /openapi/v1.json
         app.MapScalarApiReference("/scalar", options =>
         {
             options.WithTitle("Payment Service API")
