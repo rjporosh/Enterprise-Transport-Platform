@@ -1,38 +1,38 @@
-cat > update-all.sh << 'EOF'
 #!/bin/bash
-
-SERVICES=("auth" "booking" "bus" "notification" "payment" "route")
 
 echo "========================================"
 echo "  DATABASE UPDATE - ALL 6 SERVICES"
 echo "========================================"
 
-for svc in "${SERVICES[@]}"; do
-    SERVICE_NAME="${svc}-service"
-    PROJECT_NAME="$(echo ${svc} | sed 's/.*/\u&/')Service"
-    
-    INFRA="services/${SERVICE_NAME}/src/${PROJECT_NAME}.Infrastructure/${PROJECT_NAME}.Infrastructure.csproj"
-    API="services/${SERVICE_NAME}/src/${PROJECT_NAME}.Api/${PROJECT_NAME}.Api.csproj"
+update_db() {
+    local svc=$1
+    local project=$2
+    local infra="services/${svc}-service/src/${project}.Infrastructure/${project}.Infrastructure.csproj"
+    local api="services/${svc}-service/src/${project}.Api/${project}.Api.csproj"
     
     echo ""
-    echo ">>> Updating: ${SERVICE_NAME}"
+    echo ">>> Restoring & Updating: ${svc}-service"
     echo "----------------------------------------"
     
-    dotnet ef database update \
-        --project "$INFRA" \
-        --startup-project "$API"
+    dotnet restore "$api" --verbosity quiet 2>/dev/null
+    dotnet restore "$infra" --verbosity quiet 2>/dev/null
+    dotnet ef database update --project "$infra" --startup-project "$api"
     
     if [ $? -eq 0 ]; then
-        echo "✅ ${SERVICE_NAME} - SUCCESS"
+        echo "✅ ${svc}-service - SUCCESS"
     else
-        echo "❌ ${SERVICE_NAME} - FAILED"
+        echo "❌ ${svc}-service - FAILED"
     fi
-done
+}
+
+update_db "auth" "AuthService"
+update_db "booking" "BookingService"
+update_db "bus" "BusService"
+update_db "notification" "NotificationService"
+update_db "payment" "PaymentService"
+update_db "route" "RouteService"
 
 echo ""
 echo "========================================"
 echo "  ALL DONE!"
 echo "========================================"
-EOF
-
-chmod +x update-all.sh
