@@ -138,8 +138,18 @@ public static class PaymentEndpoints
         .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
         .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
 
+        // NOTE: this group previously had no .RequireAuthorization()/.RequireRateLimiting(),
+        // unlike every other group in this file — meaning SearchPayments was silently
+        // callable without a token. Payment records include CustomerId/TenantId/Amount,
+        // so an unauthenticated search endpoint is a data-exposure bug, not an
+        // intentional public endpoint (contrast with the webhook group below, which is
+        // deliberately unauthenticated because payment providers can't obtain a
+        // platform JWT — that one is protected by provider signature verification
+        // instead). Fixed to match the rest of the service.
         var searchGroup = endpoints.MapGroup("/api/v1/payments/search")
-            .WithTags("Payments");
+            .WithTags("Payments")
+            .RequireAuthorization()
+            .RequireRateLimiting("PaymentPolicy");
 
         searchGroup.MapGet("/", async (
             [AsParameters] SearchPaymentsQuery query,
