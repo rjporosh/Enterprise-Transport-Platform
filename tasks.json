@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🔄 Update All Databases",
+      "type": "shell",
+      "command": "./update-all.sh",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "🚀 Run All Services",
+      "type": "shell",
+      "command": "./run-all.sh",
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "🔄 Update Auth DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/auth-service/src/AuthService.Infrastructure/AuthService.Infrastructure.csproj --startup-project services/auth-service/src/AuthService.Api/AuthService.Api.csproj",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Update Booking DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/booking-service/src/BookingService.Infrastructure/BookingService.Infrastructure.csproj --startup-project services/booking-service/src/BookingService.Api/BookingService.Api.csproj",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Update Bus DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/bus-service/src/BusService.Infrastructure/BusService.Infrastructure.csproj --startup-project services/bus-service/src/BusService.Api/BusService.Api.csproj",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Update Notification DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/notification-service/src/NotificationService.Infrastructure/NotificationService.Infrastructure.csproj --startup-project services/notification-service/src/NotificationService.Api/NotificationService.Api.csproj",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Update Payment DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/payment-service/src/PaymentService.Infrastructure/PaymentService.Infrastructure.csproj --startup-project services/payment-service/src/PaymentService.Api/PaymentService.Api.csproj",
+      "problemMatcher": []
+    },
+    {
+      "label": "🔄 Update Route DB",
+      "type": "shell",
+      "command": "dotnet ef database update --project services/route-service/src/RouteService.Infrastructure/RouteService.Infrastructure.csproj --startup-project services/route-service/src/RouteService.Api/RouteService.Api.csproj",
+      "problemMatcher": []
+    }
+  ]
+}
