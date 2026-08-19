@@ -48,7 +48,11 @@ public sealed class GetReleaseInfoHandler : MediatR.IRequestHandler<GetReleaseIn
             },
             ChangedFeatures: new List<string>
             {
-                "CORS policy added (AllowConfiguredOrigins, reads Cors:AllowedOrigins) to match booking-service and payment-service"
+                "CORS policy added (AllowConfiguredOrigins, reads Cors:AllowedOrigins) to match booking-service and payment-service",
+                "System.Security.Cryptography.Xml bumped 10.0.6 -> 10.0.10 (fixes CVE-2026-50648 / GHSA-23rf-6693-g89p and related advisories)",
+                "Microsoft.OpenApi pinned directly to 2.7.5 to override the vulnerable 2.0.0 pulled in transitively by Microsoft.AspNetCore.OpenApi 10.0.0 (fixes GHSA-v5pm-xwqc-g5wc / CVE-2026-49451)",
+                "NU1608 (Pomelo.EntityFrameworkCore.MySql / EF Core 10 constraint mismatch) now suppressed at the project level in both AuthService.Infrastructure and AuthService.Api, not just via the PackageReference-level NoWarn that didn't reach AuthService.Api's own restore diagnostic",
+                "Removed obsolete Quartz UseMicrosoftDependencyInjectionJobFactory() call (CS0618) — it's the default already, no behavior change"
             },
             BugFixes: new List<string>
             {
