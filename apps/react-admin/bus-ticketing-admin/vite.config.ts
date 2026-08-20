@@ -19,10 +19,21 @@ export default defineConfig({
     // build — no API Gateway exists yet (infrastructure/gateway/ is an
     // empty placeholder).
     proxy: {
-      '/api/v1/auth': { target: 'http://localhost:5203', changeOrigin: true, secure: false },
+      '/api/v1/auth': { target: 'http://localhost:5101', changeOrigin: true, secure: false },
+      '/api/v1/admin': { target: 'http://localhost:5101', changeOrigin: true, secure: false },
       '/api/v1/buses': { target: 'http://localhost:5201', changeOrigin: true, secure: false },
-      '/api/v1/routes': { target: 'http://localhost:5204', changeOrigin: true, secure: false },
-      '/api/v1': { target: 'http://localhost:8080', changeOrigin: true, secure: false }
+      '/api/v1/depots': { target: 'http://localhost:5201', changeOrigin: true, secure: false },
+      '/api/v1/routes': { target: 'http://localhost:5401', changeOrigin: true, secure: false },
+      '/api/v1/schedules': { target: 'http://localhost:5401', changeOrigin: true, secure: false },
+      '/api/v1/stops': { target: 'http://localhost:5401', changeOrigin: true, secure: false },
+      // Bookings/{id} (get) and Bookings/{id}/cancel are real — see
+      // mockAdapter.ts's realBackendWithFallbackAdapter for exactly which
+      // /bookings and /trips shapes are genuinely wired vs. still on mock
+      // fixtures pending a matching backend endpoint.
+      '/api/v1/bookings': { target: 'http://localhost:5601', changeOrigin: true, secure: false },
+      '/api/v1/trips': { target: 'http://localhost:5601', changeOrigin: true, secure: false },
+      '/api/v1/payments': { target: 'http://localhost:5003', changeOrigin: true, secure: false },
+      '/api/v1/notifications': { target: 'http://localhost:5301', changeOrigin: true, secure: false }
     }
   },
   build: { outDir: 'dist', sourcemap: true }
