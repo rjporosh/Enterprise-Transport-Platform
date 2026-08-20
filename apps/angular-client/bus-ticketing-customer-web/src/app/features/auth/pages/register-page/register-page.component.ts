@@ -57,7 +57,14 @@ export class RegisterPageComponent {
       return;
     }
 
-    const ok = await this.authStore.register(this.form.getRawValue());
+    // The form keeps a single "Full name" field for a simpler sign-up UX,
+    // but auth-service's RegisterCommand wants firstName/lastName
+    // separately -- split here rather than reshape the form.
+    const { fullName, email, password } = this.form.getRawValue();
+    const [firstName, ...rest] = fullName.trim().split(/\s+/);
+    const lastName = rest.join(' ') || firstName;
+
+    const ok = await this.authStore.register({ email, password, firstName, lastName });
     if (ok) {
       this.router.navigateByUrl('/profile/bookings');
     }

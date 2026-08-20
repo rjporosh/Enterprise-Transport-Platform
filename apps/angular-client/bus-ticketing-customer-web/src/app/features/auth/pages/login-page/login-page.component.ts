@@ -5,6 +5,7 @@ import { AuthStore } from '../../../../core/auth/auth.store';
 import { ButtonComponent } from '@shared-ui/button/button.component';
 import { InputComponent } from '@shared-ui/input/input.component';
 import { CardComponent } from '@shared-ui/card/card.component';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-login-page',
@@ -36,9 +37,11 @@ import { CardComponent } from '@shared-ui/card/card.component';
           <a routerLink="/auth/register" class="text-saffron-500 underline">Create an account</a>
         </p>
 
-        <p class="text-white/30 text-xs text-center mt-3">
-          Demo mode — any email/password combination signs you in.
-        </p>
+        @if (isMockMode) {
+          <p class="text-white/30 text-xs text-center mt-3">
+            Demo mode — any email/password combination signs you in.
+          </p>
+        }
       </div>
     </main>
   `
@@ -48,10 +51,11 @@ export class LoginPageComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly authStore = inject(AuthStore);
+  protected readonly isMockMode = environment.mockApi;
 
   protected readonly form = this.fb.nonNullable.group({
-    email: ['demo@example.com', [Validators.required, Validators.email]],
-    password: ['password123', [Validators.required, Validators.minLength(6)]]
+    email: [environment.mockApi ? 'demo@example.com' : '', [Validators.required, Validators.email]],
+    password: [environment.mockApi ? 'password123' : '', [Validators.required, Validators.minLength(6)]]
   });
 
   protected async onSubmit(): Promise<void> {
