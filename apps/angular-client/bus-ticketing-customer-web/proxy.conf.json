@@ -1,18 +1,90 @@
 {
   "/api/v1/auth": {
-    "target": "http://localhost:5203",
+    "target": "http://localhost:5101",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/admin": {
+    "target": "http://localhost:5101",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/bookings": {
+    "target": "http://localhost:5601",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/trips": {
+    "target": "http://localhost:5601",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
   },
   "/api/v1/payments": {
-    "target": "http://localhost:5202",
+    "target": "http://localhost:5003",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
   },
-  "/api/v1": {
-    "target": "http://localhost:8080",
+  "/api/v1/agents": {
+    "target": "http://localhost:5003",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/webhooks": {
+    "target": "http://localhost:5003",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/buses": {
+    "target": "http://localhost:5201",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/depots": {
+    "target": "http://localhost:5201",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/routes": {
+    "target": "http://localhost:5401",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/schedules": {
+    "target": "http://localhost:5401",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/stops": {
+    "target": "http://localhost:5401",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/notifications": {
+    "target": "http://localhost:5301",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/recipients": {
+    "target": "http://localhost:5301",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api/v1/templates": {
+    "target": "http://localhost:5301",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"

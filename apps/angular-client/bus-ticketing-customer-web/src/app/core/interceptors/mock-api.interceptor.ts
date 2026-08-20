@@ -11,10 +11,11 @@ import {
   mockTripSearchResponse,
   seedMockBookings
 } from '../mock/mock-data';
-import { AuthResponse, LoginRequest, RegisterRequest } from '../auth/auth.model';
+import { CurrentUserResponse, LoginRequest, RegisterRequest, TokenPairResponse } from '../auth/auth.model';
 
 const DEMO_CUSTOMER_ID = '00000000-0000-0000-0000-000000000001';
 const LATENCY_MS = 450;
+const demoRegisteredNames = new Map<string, { firstName: string; lastName: string }>();
 
 /**
  * Full-mock mode (environment.mockApi = true): stands in for every backend
@@ -70,23 +71,53 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   seedMockBookings(DEMO_CUSTOMER_ID);
 
   // --- Auth -----------------------------------------------------------
+  // Shapes here mirror the real TokenPairResponse/UserDto (auth.model.ts)
+  // so AuthStore's login/register/getCurrentUser flow works identically
+  // whether mockApi is on or off.
   if (path === '/auth/login' && req.method === 'POST') {
     const body = req.body as LoginRequest;
     if (!body?.email || !body?.password) {
       return respondError(400, 'Email and password are required.');
     }
-    const response: AuthResponse = {
+    const response: TokenPairResponse = {
       accessToken: `demo-token-${Date.now()}`,
-      user: { customerId: DEMO_CUSTOMER_ID, fullName: body.email.split('@')[0], email: body.email }
+      accessTokenExpiresAtUtc: new Date(Date.now() + 3600_000).toISOString(),
+      refreshToken: `demo-refresh-${Date.now()}`,
+      refreshTokenExpiresAtUtc: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      userId: DEMO_CUSTOMER_ID,
+      email: body.email,
+      roles: ['Customer']
     };
     return respond(response);
   }
 
   if (path === '/auth/register' && req.method === 'POST') {
     const body = req.body as RegisterRequest;
-    const response: AuthResponse = {
+    const response: TokenPairResponse = {
       accessToken: `demo-token-${Date.now()}`,
-      user: { customerId: DEMO_CUSTOMER_ID, fullName: body.fullName, email: body.email }
+      accessTokenExpiresAtUtc: new Date(Date.now() + 3600_000).toISOString(),
+      refreshToken: `demo-refresh-${Date.now()}`,
+      refreshTokenExpiresAtUtc: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      userId: DEMO_CUSTOMER_ID,
+      email: body.email,
+      roles: ['Customer']
+    };
+    demoRegisteredNames.set(DEMO_CUSTOMER_ID, { firstName: body.firstName, lastName: body.lastName });
+    return respond(response);
+  }
+
+  if (path === '/auth/me' && req.method === 'GET') {
+    const name = demoRegisteredNames.get(DEMO_CUSTOMER_ID) ?? { firstName: 'Demo', lastName: 'User' };
+    const response: CurrentUserResponse = {
+      id: DEMO_CUSTOMER_ID,
+      email: 'demo@example.com',
+      firstName: name.firstName,
+      lastName: name.lastName,
+      phoneNumber: null,
+      isEmailVerified: true,
+      createdAtUtc: new Date().toISOString(),
+      lastLoginAtUtc: new Date().toISOString(),
+      roles: ['Customer']
     };
     return respond(response);
   }

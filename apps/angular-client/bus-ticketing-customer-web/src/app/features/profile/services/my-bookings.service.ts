@@ -13,7 +13,7 @@ export class MyBookingsService {
     return this.http.get<Booking[]>(`${this.baseUrl}/mine`);
   }
 
-  cancel(bookingId: string, reason: string): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/${bookingId}/cancel`, { reason });
+  cancel(bookingId: string, customerId: string, reason: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/${bookingId}/cancel`, { customerId, reason });
   }
 }

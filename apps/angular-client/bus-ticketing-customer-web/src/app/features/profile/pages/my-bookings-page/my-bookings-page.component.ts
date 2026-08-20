@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MyBookingsService } from '../../services/my-bookings.service';
 import { Booking } from '../../../../shared/types/booking.model';
+import { AuthStore } from '../../../../core/auth/auth.store';
 import { PageHeaderComponent } from '@shared-ui/page-header/page-header.component';
 import { CardComponent } from '@shared-ui/card/card.component';
 import { BadgeComponent, statusToBadgeTone } from '@shared-ui/badge/badge.component';
@@ -76,6 +77,7 @@ import { ModalComponent } from '@shared-ui/modal/modal.component';
 })
 export class MyBookingsPageComponent implements OnInit {
   private readonly bookingsService = inject(MyBookingsService);
+  private readonly authStore = inject(AuthStore);
 
   protected readonly bookings = signal<Booking[]>([]);
   protected readonly loading = signal(true);
@@ -102,10 +104,11 @@ export class MyBookingsPageComponent implements OnInit {
 
   protected confirmCancel(): void {
     const target = this.cancelTarget();
-    if (!target) return;
+    const customerId = this.authStore.user()?.customerId;
+    if (!target || !customerId) return;
 
     this.cancelling.set(true);
-    this.bookingsService.cancel(target.bookingId, 'Customer requested cancellation').subscribe({
+    this.bookingsService.cancel(target.bookingId, customerId, 'Customer requested cancellation').subscribe({
       next: () => {
         this.bookings.update((list) =>
           list.map((b) => (b.bookingId === target.bookingId ? { ...b, status: 'Cancelled' } : b))

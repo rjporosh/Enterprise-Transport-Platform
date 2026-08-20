@@ -4,13 +4,12 @@ import { BookingService } from '../../features/booking/services/booking.service'
 import { Booking, CreateBookingRequest, PassengerInput } from '../../shared/types/booking.model';
 import { TripSearchResult } from '../../shared/types/trip.model';
 import { ApiProblemDetails } from '../../core/interceptors/error.interceptor';
-
-/** Placeholder until the Auth feature is built — real customer id comes from the JWT. */
-const DEMO_CUSTOMER_ID = '00000000-0000-0000-0000-000000000001';
+import { AuthStore } from '../../core/auth/auth.store';
 
 @Injectable({ providedIn: 'root' })
 export class BookingStore {
   private readonly bookingService = inject(BookingService);
+  private readonly authStore = inject(AuthStore);
 
   private readonly _selectedTrip = signal<TripSearchResult | null>(null);
   private readonly _passengers = signal<PassengerInput[]>([]);
@@ -41,12 +40,18 @@ export class BookingStore {
       return null;
     }
 
+    const customerId = this.authStore.user()?.customerId;
+    if (!customerId) {
+      this._error.set('You must be signed in to complete a booking.');
+      return null;
+    }
+
     this._submitting.set(true);
     this._error.set(null);
 
     const request: CreateBookingRequest = {
       tripId: trip.tripId,
-      customerId: DEMO_CUSTOMER_ID,
+      customerId,
       passengers: this._passengers()
     };
 
