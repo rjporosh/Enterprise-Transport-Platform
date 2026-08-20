@@ -2,13 +2,14 @@ import { FormEvent, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { Button, Card, Input } from '@shared-ui/react';
+import { env } from '../../../config/env';
 
 export default function LoginPage() {
   const { login, submitting, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('admin@transport.local');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState(env.mockApi ? 'admin@transport.local' : '');
+  const [password, setPassword] = useState(env.mockApi ? 'password123' : '');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,7 +51,9 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <p className="text-white/30 text-xs text-center mt-4">Demo mode — any email/password combination signs you in.</p>
+        {env.mockApi && (
+          <p className="text-white/30 text-xs text-center mt-4">Demo mode — any email/password combination signs you in.</p>
+        )}
       </div>
     </main>
   );

@@ -1,8 +1,9 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { authApi } from './api/auth.api';
-import { AdminAuthUser, LoginRequest } from './models/auth.model';
+import { AdminAuthUser, LoginRequest, TokenPairResponse } from './models/auth.model';
 
 const TOKEN_KEY = 'admin_access_token';
+const REFRESH_TOKEN_KEY = 'admin_refresh_token';
 const USER_KEY = 'admin_auth_user';
 
 interface AuthContextValue {
@@ -31,12 +32,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await authApi.login(payload);
-      sessionStorage.setItem(TOKEN_KEY, response.accessToken);
-      sessionStorage.setItem(USER_KEY, JSON.stringify(response.user));
-      setUser(response.user);
+      // auth-service's /auth/login only returns a token pair (see
+      // TokenPairResponse) — no name/role-friendly fields beyond
+      // email/userId/roles. One follow-up GET /auth/me call fills in the
+      // rest of what the console renders. If that call fails, the session
+      // is not considered established.
+      const tokens: TokenPairResponse = await authApi.login(payload);
+      sessionStorage.setItem(TOKEN_KEY, tokens.accessToken);
+      sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+
+      const profile = await authApi.me();
+      const adminUser: AdminAuthUser = {
+        userId: profile.id,
+        fullName: `${profile.firstName} ${profile.lastName}`.trim(),
+        email: profile.email,
+        roles: profile.roles
+      };
+
+      sessionStorage.setItem(USER_KEY, JSON.stringify(adminUser));
+      setUser(adminUser);
+
+      // The account can sign in with any role — auth-service doesn't
+      // reject login by role — but every actual admin write/read under
+      // /api/v1/admin/* is [RequireRole("Admin")] server-side, so a
+      // non-Admin account will see 401/403s on those screens even though
+      // login itself succeeded. Surface that up front instead of letting
+      // it show up as a confusing later failure.
+      if (!adminUser.roles.includes('Admin')) {
+        setError(
+          `Signed in, but this account has no "Admin" role (roles: ${adminUser.roles.join(', ') || 'none'}). ` +
+            'Admin-only screens will fail until an existing Admin grants this role — see ai-handover.md for how to bootstrap the first Admin.'
+        );
+      }
+
       return true;
     } catch {
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
       setError('Unable to sign in right now.');
       return false;
     } finally {
@@ -46,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     setUser(null);
   }, []);
