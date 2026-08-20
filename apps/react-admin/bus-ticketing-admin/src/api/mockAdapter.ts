@@ -11,6 +11,7 @@ import {
   getMockBookingById,
   MOCK_BOOKINGS
 } from './mock/fixtures';
+import type { CurrentUserResponse, TokenPairResponse } from '../modules/auth/models/auth.model';
 
 const LATENCY_MS = 350;
 const DEMO_ADMIN = { userId: 'usr-1', fullName: 'Ariful Haque', email: 'admin@transport.local', role: 'Admin' as const };
@@ -84,7 +85,30 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   if (path === '/auth/login' && method === 'POST') {
     const body = JSON.parse(config.data ?? '{}');
     if (!body.email || !body.password) return fail(config, 400, 'Email and password are required.');
-    return ok(config, { accessToken: `demo-admin-token-${Date.now()}`, user: DEMO_ADMIN });
+    const tokens: TokenPairResponse = {
+      accessToken: `demo-admin-token-${Date.now()}`,
+      accessTokenExpiresAtUtc: new Date(Date.now() + 3600_000).toISOString(),
+      refreshToken: `demo-admin-refresh-${Date.now()}`,
+      refreshTokenExpiresAtUtc: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      userId: DEMO_ADMIN.userId,
+      email: body.email,
+      roles: ['Admin']
+    };
+    return ok(config, tokens);
+  }
+  if (path === '/auth/me' && method === 'GET') {
+    const profile: CurrentUserResponse = {
+      id: DEMO_ADMIN.userId,
+      email: DEMO_ADMIN.email,
+      firstName: DEMO_ADMIN.fullName.split(' ')[0],
+      lastName: DEMO_ADMIN.fullName.split(' ').slice(1).join(' ') || DEMO_ADMIN.fullName,
+      phoneNumber: null,
+      isEmailVerified: true,
+      createdAtUtc: new Date().toISOString(),
+      lastLoginAtUtc: new Date().toISOString(),
+      roles: ['Admin']
+    };
+    return ok(config, profile);
   }
 
   // --- Dashboard -----------------------------------------------------------
@@ -118,13 +142,59 @@ export const mockAdapter: AxiosAdapter = async (config) => {
   }
 
   // --- Buses -----------------------------------------------------------------
+  // Wrapped the same way bus-service really wraps it (Result<T> with a
+  // `value` envelope) and reshaped to BusDto's real field names, so
+  // busesApi.list()'s unwrap/mapping code behaves identically in full-mock
+  // mode and against the real backend.
   if (path === '/buses' && method === 'GET') {
-    return ok(config, paginate(MOCK_BUSES, page, pageSize));
+    const page_ = paginate(MOCK_BUSES, page, pageSize);
+    const busDtos = page_.items.map((b, i) => ({
+      id: b.busId,
+      operatorId: `operator-${(i % 4) + 1}`,
+      plateNumber: b.plateNumber,
+      busType: b.busType,
+      totalSeats: b.capacity,
+      depotId: 'depot-1',
+      status: b.status === 'Maintenance' ? 'UnderMaintenance' : b.status === 'Suspended' ? 'Retired' : 'Active',
+      manufacturer: null,
+      model: null
+    }));
+    return ok(config, {
+      success: true,
+      message: 'OK',
+      value: { items: busDtos, page: page_.page, pageSize: page_.pageSize, totalCount: page_.totalCount }
+    });
   }
 
   // --- Routes ------------------------------------------------------------
+  // --- Routes ------------------------------------------------------------
+  // Reshaped to real RouteDto field names (stop ids + TimeSpan duration
+  // string) plus a matching /stops handler, so routesApi.list()'s mapping
+  // code behaves identically in full-mock mode and against the real
+  // backend. "Active trips" has no source in either case -- route-service
+  // doesn't track live trips, only route+stop metadata.
   if (path === '/routes' && method === 'GET') {
-    return ok(config, paginate(MOCK_ROUTES, page, pageSize));
+    const page_ = paginate(MOCK_ROUTES, page, pageSize);
+    const items = page_.items.map((r, i) => ({
+      id: r.routeId,
+      code: `RT-${100 + i}`,
+      name: r.name,
+      originStopId: `stop-origin-${i}`,
+      destinationStopId: `stop-dest-${i}`,
+      transportMode: 'Bus',
+      distanceKm: r.distanceKm,
+      estimatedDuration: `${String(Math.floor(r.estimatedDurationMinutes / 60)).padStart(2, '0')}:${String(r.estimatedDurationMinutes % 60).padStart(2, '0')}:00`,
+      status: 'Active'
+    }));
+    return ok(config, { items, page: page_.page, pageSize: page_.pageSize, totalCount: page_.totalCount });
+  }
+
+  if (path === '/stops' && method === 'GET') {
+    const stops = MOCK_ROUTES.flatMap((r, i) => [
+      { id: `stop-origin-${i}`, city: r.originCity },
+      { id: `stop-dest-${i}`, city: r.destinationCity }
+    ]);
+    return ok(config, { items: stops, page: 1, pageSize: stops.length, totalCount: stops.length });
   }
 
   // --- Users -----------------------------------------------------------------
@@ -141,12 +211,12 @@ export const mockAdapter: AxiosAdapter = async (config) => {
 const realHttp = axios.create({ timeout: 10_000 });
 
 /**
- * Real mode (VITE_USE_MOCK_API=false): auth-service (/auth/login),
- * bus-service (/buses) and route-service (/routes) are implemented and
- * reachable now, as are booking-service's /bookings/{id} (get) and
- * /bookings/{id}/cancel — those go out over real HTTP to env.apiBaseUrl
- * (see httpClient.ts's baseURL) exactly as axios would without any
- * adapter override.
+ * Real mode (VITE_USE_MOCK_API=false): auth-service (/auth/login,
+ * /auth/me), bus-service (/buses) and route-service (/routes, /stops) are
+ * implemented and reachable now, as are booking-service's /bookings/{id}
+ * (get) and /bookings/{id}/cancel — those go out over real HTTP to
+ * env.apiBaseUrl (see httpClient.ts's baseURL) exactly as axios would
+ * without any adapter override.
  *
  * Three surfaces this console calls have no matching real endpoint
  * anywhere in the platform, so routing them to a real backend would just
