@@ -221,6 +221,20 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
 }
 
+// ---------- Dev-only admin bootstrap ----------
+// Guarantees a working Admin login exists on a fresh database. Off by
+// default; enable with BOOTSTRAP_ADMIN_ENABLED=true (dev/local only -- see
+// DevAdminBootstrapper.cs for the safety rationale). Runs after migrations
+// so the roles/users tables are guaranteed to exist first.
+if (app.Environment.IsDevelopment())
+{
+    await AuthService.Api.DevBootstrap.DevAdminBootstrapper.RunAsync(
+        app.Services,
+        app.Configuration,
+        app.Logger,
+        CancellationToken.None);
+}
+
 app.Run();
 
 // Exposed for WebApplicationFactory<Program> in AuthService.IntegrationTests.

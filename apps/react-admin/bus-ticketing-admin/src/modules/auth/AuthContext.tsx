@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { authApi } from './api/auth.api';
+import { describeApiError } from '../../api/errorMessage';
 import { AdminAuthUser, LoginRequest, TokenPairResponse } from './models/auth.model';
 
 const TOKEN_KEY = 'admin_access_token';
@@ -66,10 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return true;
-    } catch {
+    } catch (err) {
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-      setError('Unable to sign in right now.');
+      // Logs the real cause (network/CORS/timeout/4xx/5xx/malformed) to the
+      // console and returns a message that actually distinguishes them,
+      // instead of the previous bare catch that discarded everything and
+      // always showed "Unable to sign in right now."
+      setError(describeApiError(err, 'AuthContext.login'));
       return false;
     } finally {
       setSubmitting(false);

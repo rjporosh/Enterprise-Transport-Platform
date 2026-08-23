@@ -256,9 +256,14 @@ const realBackendWithFallbackAdapter: AxiosAdapter = async (config) => {
     return ok(config, paginate(items, Number(params.page ?? 1), Number(params.pageSize ?? 20)));
   }
 
-  // Everything else (auth/login, buses, routes, bookings/{id},
+// Everything else (auth/login, buses, routes, bookings/{id},
   // bookings/{id}/cancel) has a real backend — make the actual HTTP call.
-  return realHttp.request(config);
+  // IMPORTANT: remove the custom adapter before delegating to Axios,
+  // otherwise Axios will invoke realBackendWithFallbackAdapter again,
+  // causing infinite recursion and "Maximum call stack size exceeded".
+  const { adapter: _adapter, ...realConfig } = config;
+
+  return realHttp.request(realConfig);
 };
 
 export const httpAdapter = (useMock: boolean): AxiosAdapter =>

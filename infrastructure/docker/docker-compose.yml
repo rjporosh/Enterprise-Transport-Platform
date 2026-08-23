@@ -306,6 +306,13 @@ services:
       Jwt__Issuer: "https://identity.bus-ticketing.local"
       Jwt__Audience: "bus-ticketing-api"
       Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+      # Dev-only guaranteed Admin login -- see DevAdminBootstrapper.cs.
+      # Disabled by default even here; flip to "true" for a local/dev stack
+      # that needs a working admin account out of the box. Never set this
+      # to true in a production compose file/environment.
+      BOOTSTRAP_ADMIN_ENABLED: "false"
+      BOOTSTRAP_ADMIN_EMAIL: "admin@bus.local"
+      BOOTSTRAP_ADMIN_PASSWORD: "Admin@12345!"
     ports:
       - "5203:8080"
 
