@@ -1,3 +1,14 @@
+# AI Handover — ROOT (READ THIS FIRST — points to the current session)
+
+**2026-08-20 frontend real-API wiring pass** — see
+`apps/angular-client/bus-ticketing-customer-web/ai-handover.md` and
+`apps/react-admin/bus-ticketing-admin/ai-handover.md` (and their sibling
+`release-notes.md` files) for what was fixed, what's a genuine
+documented backend gap vs. what's frontend work, and exact test/next-step
+instructions for both apps. Backend was not touched in that pass.
+
+---
+
 # AI Handover — 2026-08-16 session #3 (READ THIS SECTION FIRST)
 
 ## Fixed this session (root cause, verified by static analysis — not by
