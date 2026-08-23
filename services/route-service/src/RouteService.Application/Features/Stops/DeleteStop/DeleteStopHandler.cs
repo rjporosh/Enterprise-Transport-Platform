@@ -32,7 +32,11 @@ public sealed class DeleteStopHandler : IRequestHandler<DeleteStopCommand, Resul
 
         if (stop is null) return Result.Failure(new Error("StopNotFound", $"Stop '{request.StopId}' was not found."));
 
-        var isUsed = await _context.RouteStops.AnyAsync(rs => rs.StopId == request.StopId && !rs.Route.IsDeleted, cancellationToken);
+        var isUsed = await _context.RouteStops.AnyAsync(
+            rs => rs.StopId == request.StopId && 
+                  rs.Route != null && 
+                  !rs.Route.IsDeleted, 
+            cancellationToken);
         if (isUsed) return Result.Failure(new Error("StopInUse", "Cannot delete a stop that is currently used by one or more routes."));
 
         stop.SoftDelete(_clock.UtcNow);
