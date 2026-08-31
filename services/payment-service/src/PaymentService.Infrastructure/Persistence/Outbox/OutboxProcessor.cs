@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PaymentService.Application.Common.Interfaces;
 using PaymentService.Infrastructure.Messaging;
+using Platform.Contracts.Messaging;
 
 namespace PaymentService.Infrastructure.Persistence.Outbox;
 
@@ -65,7 +66,15 @@ public class OutboxProcessor : BackgroundService
         {
             try
             {
-                var routingKey = DeriveRoutingKey(message.EventType);
+                IntegrationEventRoutingKeys.TryResolve(message.EventType, ServicePrefix, out var routingKey, out var fromRegistry);
+                if (!fromRegistry)
+                {
+                    _logger.LogWarning(
+                        "Outbox event type {EventType} is not in Platform.Contracts EventTypeRegistry; " +
+                        "published with the deterministic fallback key {RoutingKey}. Add it to the registry.",
+                        message.EventType, routingKey);
+                }
+
                 await _messageBusPublisher.PublishAsync(routingKey, message.Payload, cancellationToken);
 
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
@@ -87,20 +96,13 @@ public class OutboxProcessor : BackgroundService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private static string DeriveRoutingKey(string eventType)
-    {
-        var typeName = eventType.Split('.').Last();
-        if (typeName.EndsWith("DomainEvent"))
-            typeName = typeName[..^"DomainEvent".Length];
-
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < typeName.Length; i++)
-        {
-            if (char.IsUpper(typeName[i]) && i > 0)
-                sb.Append('.');
-            sb.Append(char.ToLowerInvariant(typeName[i]));
-        }
-
-        return "payment." + sb.ToString();
-    }
+    /// <summary>
+    /// Service prefix for the deterministic fallback in
+    /// <see cref="IntegrationEventRoutingKeys"/>. Known payment events resolve
+    /// from the explicit <c>Platform.Contracts.EventTypeRegistry</c>
+    /// (<c>payment.succeeded</c>/<c>payment.failed</c>/…). The old
+    /// <c>DeriveRoutingKey</c> split the stored AssemblyQualifiedName on '.',
+    /// producing keys like <c>payment.0, culture=neutral…</c> (P0-4). It is gone.
+    /// </summary>
+    private const string ServicePrefix = "payment";
 }

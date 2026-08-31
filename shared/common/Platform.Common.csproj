@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Platform.Common — reusable ASP.NET cross-cutting building blocks
+    (correlation middleware, security headers, outbound-correlation handler,
+    tenant-header hygiene).
+
+    Uses Sdk.Web only for the ASP.NET framework reference; it produces a
+    library, not an app (no entry point). The gateway consumes it now; the six
+    services adopt these incrementally to replace their six copied middlewares
+    (P0-2) — that migration is explicitly out of scope for M0.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Platform.Common</RootNamespace>
+    <AssemblyName>Platform.Common</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Reusable ASP.NET cross-cutting middleware and handlers for the Enterprise Transport Platform.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\shared-kernel\Platform.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

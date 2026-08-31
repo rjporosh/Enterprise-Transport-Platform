@@ -1,0 +1,15 @@
+# Build context is the repo root; keep host build output and unrelated trees
+# out of the image so a clean in-container restore/publish is used.
+**/bin/
+**/obj/
+**/node_modules/
+**/.git/
+**/.vs/
+**/.vscode/
+**/*.user
+**/TestResults/
+apps/
+docs/
+tests/
+services/*/tests/
+**/.DS_Store

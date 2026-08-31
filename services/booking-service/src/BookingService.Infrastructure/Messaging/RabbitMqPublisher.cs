@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Options;
+using Platform.SharedKernel.Correlation;
 using RabbitMQ.Client;
 
 namespace BookingService.Infrastructure.Messaging;
@@ -47,6 +48,14 @@ public sealed class RabbitMqPublisher : IMessageBusPublisher, IDisposable
         var properties = _channel.Value.CreateBasicProperties();
         properties.Persistent = true;
         properties.ContentType = "application/json";
+
+        // Carry the ambient correlation id onto the message when one exists
+        // (M0). For the outbox background path this is currently null — durable
+        // outbox correlation needs an outbox CorrelationId column, deferred to
+        // M2/M9 (see docs/programmers-guide/correlation-id.md).
+        var correlationId = CorrelationContext.Current;
+        if (!string.IsNullOrEmpty(correlationId))
+            properties.CorrelationId = correlationId;
 
         _channel.Value.BasicPublish(_options.Exchange, routingKey, properties, body);
         return Task.CompletedTask;

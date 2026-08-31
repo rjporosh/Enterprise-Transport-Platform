@@ -2,6 +2,16 @@
 
 **Audit date:** 2026-08-31. **Commit:** `73081634`. **Mode:** audit only (no code changed).
 
+> **M0 update (2026-09-01):** an **API gateway now exists** — `infrastructure/gateway`
+> (`Platform.Gateway`, YARP), container `api-gateway` on host port **8088**. Both frontends
+> call the gateway only (single origin); it routes `/api/v1/*` by path prefix to the six
+> services, injects/validates `X-Correlation-Id`, and **strips client-supplied `X-Tenant-Id`**
+> before forwarding (re-injecting it only from a validated JWT claim). See
+> `docs/programmers-guide/gateway.md`. The endpoint tables below are unchanged — the gateway
+> adds no endpoints and changes no service contract. The routing-key column notes below the
+> tables are now fixed (P0-4): all outbox processors emit the stable keys from
+> `Platform.Contracts.EventTypes`.
+
 This is the single source of truth for endpoint-level gaps. It **supersedes** the inline
 mock-comment "documentation" in
 `apps/angular-client/bus-ticketing-customer-web/src/app/core/interceptors/mock-api.interceptor.ts`
@@ -155,8 +165,8 @@ Finding IDs (`P0-n` …) refer to `PRODUCTION-GAP-ANALYSIS.md`.
 | Concern | State |
 |---|---|
 | `Idempotency-Key` | bus only (Redis, with the pre-auth ordering bug); notification in-memory; payment domain-level on create only; auth/booking/route none. Dangerous mutations (booking create, payment process/confirm/refund, webhooks, notification send) mostly unprotected — P1-13/P1-15. |
-| Correlation ID | Ingress middleware in all 6; **not** propagated to outbound HTTP, RabbitMQ (`BasicProperties.CorrelationId` never set), or Quartz — P1-16. |
-| Rate limiting | In-memory fixed-window; route global bucket; booking none; `X-Forwarded-For` trusted without a proxy allowlist — P1-13. |
-| Tenant scoping | Only payment attempts it, from a spoofable header — P0-11. Others don't tenant-scope at all — P2-1. |
+| Correlation ID | **M0:** gateway generates/validates/propagates `X-Correlation-Id` to services; all 6 `RabbitMqPublisher`s now set `BasicProperties.CorrelationId` when an ambient value exists. Still not carried *through the outbox* (needs a persisted column → M2/M9) or into Quartz jobs (→ M9). Per-service ingress middleware unchanged (P1-16 remainder). |
+| Rate limiting | **M0:** gateway adds an edge backstop — IP/user/tenant-partitioned fixed-window, 3 policies (`gateway-global` 300, `gateway-auth` 20, `gateway-payment` 60 per min). Still in-memory (→ Redis in M9); per-service limiters unchanged (route global bucket, booking none — P1-13). |
+| Tenant scoping | **M0:** the gateway strips client-supplied `X-Tenant-Id`/`Company`/`Org` and re-injects only from a validated JWT claim — so once traffic goes through the gateway the header can't be spoofed. Services still don't *enforce* tenant scope from claims (payment's optional header check unchanged — P0-11; others none — P2-1). |
 | Result / error envelope | Per-service `Result`/`Error` types drift; validation doesn't always return all errors — P2-3. |
 | Pagination | Present on list endpoints (`X-Pagination` header) but max-page-size enforcement is inconsistent. |

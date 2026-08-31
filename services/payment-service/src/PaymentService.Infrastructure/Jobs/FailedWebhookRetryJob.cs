@@ -5,6 +5,7 @@ using PaymentService.Application.Common.Interfaces;
 using PaymentService.Infrastructure.Messaging;
 using PaymentService.Infrastructure.Persistence;
 using PaymentService.Infrastructure.Persistence.Outbox;
+using Platform.Contracts.Messaging;
 using Quartz;
 
 namespace PaymentService.Infrastructure.Jobs;
@@ -47,7 +48,15 @@ public class FailedWebhookRetryJob : IJob
         {
             try
             {
-                var routingKey = DeriveRoutingKey(message.EventType);
+                IntegrationEventRoutingKeys.TryResolve(message.EventType, "payment", out var routingKey, out var fromRegistry);
+                if (!fromRegistry)
+                {
+                    _logger.LogWarning(
+                        "Outbox event type {EventType} is not in Platform.Contracts EventTypeRegistry; " +
+                        "retried with the deterministic fallback key {RoutingKey}. Add it to the registry.",
+                        message.EventType, routingKey);
+                }
+
                 await messageBusPublisher.PublishAsync(routingKey, message.Payload, context.CancellationToken);
 
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
@@ -64,22 +73,5 @@ public class FailedWebhookRetryJob : IJob
 
         await dbContext.SaveChangesAsync(context.CancellationToken);
         _logger.LogInformation("FailedWebhookRetryJob completed");
-    }
-
-    private static string DeriveRoutingKey(string eventType)
-    {
-        var typeName = eventType.Split('.').Last();
-        if (typeName.EndsWith("DomainEvent"))
-            typeName = typeName[..^"DomainEvent".Length];
-
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < typeName.Length; i++)
-        {
-            if (char.IsUpper(typeName[i]) && i > 0)
-                sb.Append('.');
-            sb.Append(char.ToLowerInvariant(typeName[i]));
-        }
-
-        return "payment." + sb.ToString();
     }
 }

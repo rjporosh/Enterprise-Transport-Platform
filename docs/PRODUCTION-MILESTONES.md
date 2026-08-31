@@ -12,7 +12,60 @@ Finding IDs (`P0-n`, `P1-n`, …) refer to `PRODUCTION-GAP-ANALYSIS.md`.
 
 ---
 
-## M0 — Shared kernel + API gateway skeleton  *(P0-1, P0-2, P2-3)*
+## M0 — Shared kernel + API gateway skeleton  *(P0-1, P0-2, P0-4, P2-3)*  — ✅ DONE (2026-09-01)
+
+**Delivered:**
+- `shared/shared-kernel` (`Platform.SharedKernel`) — `PlatformHeaders`, `CorrelationId`,
+  `CorrelationContext` (AsyncLocal, replaces the racy `static` fields), `TenantContext` +
+  `ITenantContextAccessor`, `Error`/`Result`/`Result<T>`, `ApiResponse<T>`,
+  `PageRequest`/`PagedResult<T>`, `IdempotencyStore` contract, `RequestMetadata`.
+- `shared/contracts` (`Platform.Contracts`) — `EventTypes` (all stable routing keys),
+  `EventTypeRegistry` (40 domain events → keys), `IntegrationEventRoutingKeys` resolver
+  (AQN/FullName/bare → key, deterministic no-double-prefix fallback), versioned
+  `IntegrationEvents.*V1` contract records. **226 contract tests.**
+- `shared/common` (`Platform.Common`) — canonical `CorrelationIdMiddleware`,
+  `CorrelationPropagationHandler`, `SecurityHeadersMiddleware`, `TenantHeaderHygieneMiddleware`,
+  `UsePlatformEdge()` / `UseTenantHeaderHygiene()`.
+- **`infrastructure/gateway`** (`Platform.Gateway`) — YARP 2.3.0, 16 routes / 7 clusters
+  (config-only), correlation ingress + YARP transform, tenant-header strip + claim
+  re-inject, edge rate limiting (IP/user/tenant partitioned, 3 policies), security headers,
+  10 MB body cap, per-cluster 30 s timeout, passive health checks, Serilog + OTel +
+  `/metrics`, JWT-key-required-in-Production guard. Dockerfile (non-root `app`, HEALTHCHECK).
+  **21 gateway tests.**
+- **Routing-key fix (P0-4)** — all 6 `OutboxProcessor`s + payment's `FailedWebhookRetryJob`
+  now use `IntegrationEventRoutingKeys.Resolve`. No `ToRoutingKey`/`DeriveRoutingKey` /
+  AssemblyQualifiedName-as-routing-key left. **4 real-RabbitMQ integration tests** prove
+  publish → `booking.confirmed` → bound queue receives it (and the old double-prefixed key
+  does *not* match).
+- **RabbitMQ correlation** — all 6 `RabbitMqPublisher`s set `IBasicProperties.CorrelationId`
+  from `CorrelationContext.Current` when present.
+- **Frontends** — Angular `proxy.conf.json` + `nginx.conf` + `environment*.ts` (+ new
+  `environment.staging.ts` + `angular.json` staging config); React `vite.config.ts` +
+  `nginx.conf` + `.env.{example,development,staging,production}` + `env.ts`. Every API call
+  now goes to the single gateway; grep confirms zero direct service URLs/ports.
+- **docker-compose** — `api-gateway` service (host `8088`), frontends `depends_on` it,
+  their nginx targets it.
+- Shared projects added to all 6 service `.sln`s; new `shared/Platform.Shared.sln` +
+  `infrastructure/gateway/Platform.Gateway.sln`.
+- Docs: `docs/programmers-guide/{gateway,messaging-contracts,correlation-id}.md`; `guide.md`,
+  `ai-handover.md`, `docs/API-GAPS.md`, root `release-notes.md`.
+
+**Verification:** all 6 service `.sln` build clean; **155/155 existing unit tests green**
+(no regression); 226 + 21 + 4 = **251 new tests green**; gateway Docker image builds & runs
+non-root with health 200; gateway→service routing + correlation preserve + `X-Tenant-Id`
+strip verified end-to-end with the real image. The 2 pre-existing auth *integration* test
+failures (`Admin_ListPermissions`, `SecurityQuestions_ConfigureAndVerify`) were confirmed
+present on the clean baseline — **unrelated to M0**.
+
+**Deferred (documented, tracked):** outbox `CorrelationId` column + full end-to-end message
+correlation → M2/M9; Redis distributed rate limiter → M9; OTLP collector/Jaeger/Grafana →
+M8; consumer inbox de-dup → M7; services adopting `shared/common` middleware & the shared
+`CorrelationPropagationHandler` on outbound clients → M9/ongoing; per-service JWT keys →
+M11; EF Core 9→10 for notification-service → M7.
+
+---
+
+### Original M0 plan (for reference)
 
 **Goal:** one public ingress; one copy of every cross-cutting concern.
 
@@ -333,7 +386,7 @@ no secret literal in the repo; all 6 images non-root with a healthcheck.
 
 | Milestone | Status | Commit |
 |-----------|--------|--------|
-| M0 Shared kernel + gateway | Not started | |
+| M0 Shared kernel + gateway | ✅ Done (2026-09-01) | feat(platform): implement M0 shared kernel and YARP gateway |
 | M1 Auth hardening | Not started | |
 | M2 Booking correctness | Not started | |
 | M3 Payment safety | Not started | |

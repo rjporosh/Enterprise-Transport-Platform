@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NotificationService.Infrastructure.Messaging;
+using Platform.Contracts.Messaging;
 
 namespace NotificationService.Infrastructure.Persistence.Outbox;
 
@@ -57,7 +58,15 @@ public sealed class OutboxProcessor : BackgroundService
         {
             try
             {
-                var routingKey = ToRoutingKey(message.EventType);
+                IntegrationEventRoutingKeys.TryResolve(message.EventType, ServicePrefix, out var routingKey, out var fromRegistry);
+                if (!fromRegistry)
+                {
+                    _logger.LogWarning(
+                        "Outbox event type {EventType} is not in Platform.Contracts EventTypeRegistry; " +
+                        "published with the deterministic fallback key {RoutingKey}. Add it to the registry.",
+                        message.EventType, routingKey);
+                }
+
                 await publisher.PublishAsync(routingKey, message.Payload, cancellationToken);
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
             }
@@ -73,12 +82,11 @@ public sealed class OutboxProcessor : BackgroundService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>"NotificationService.Domain.Events.NotificationSentDomainEvent, ..." -&gt; "notification.sent"</summary>
-    private static string ToRoutingKey(string assemblyQualifiedEventType)
-    {
-        var shortName = assemblyQualifiedEventType.Split(',')[0].Split('.').Last();
-        var withoutSuffix = shortName.Replace("DomainEvent", string.Empty);
-        return "notification." + string.Concat(withoutSuffix.Select((c, i) =>
-            i > 0 && char.IsUpper(c) ? "." + char.ToLower(c) : char.ToLower(c).ToString()));
-    }
+    /// <summary>
+    /// Service prefix for the deterministic fallback in
+    /// <see cref="IntegrationEventRoutingKeys"/>. Known notification events
+    /// resolve from the explicit <c>Platform.Contracts.EventTypeRegistry</c>.
+    /// The old munging produced <c>notification.notification.sent</c> (P0-4) and is gone.
+    /// </summary>
+    private const string ServicePrefix = "notification";
 }

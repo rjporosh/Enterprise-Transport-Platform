@@ -32,6 +32,12 @@
                 { "replace": "src/environments/environment.ts", "with": "src/environments/environment.prod.ts" }
               ]
             },
+            "staging": {
+              "outputHashing": "all",
+              "fileReplacements": [
+                { "replace": "src/environments/environment.ts", "with": "src/environments/environment.staging.ts" }
+              ]
+            },
             "development": {
               "optimization": false,
               "extractLicenses": false,
@@ -47,6 +53,7 @@
           },
           "configurations": {
             "production": { "buildTarget": "bus-ticketing-customer-web:build:production" },
+            "staging": { "buildTarget": "bus-ticketing-customer-web:build:staging" },
             "development": { "buildTarget": "bus-ticketing-customer-web:build:development" }
           },
           "defaultConfiguration": "development"

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Platform.Contracts.Messaging;
 
 namespace BusService.Infrastructure.Persistence.Outbox;
 
@@ -56,7 +57,15 @@ public sealed class OutboxProcessor : BackgroundService
         {
             try
             {
-                var routingKey = ToRoutingKey(message.EventType);
+                IntegrationEventRoutingKeys.TryResolve(message.EventType, ServicePrefix, out var routingKey, out var fromRegistry);
+                if (!fromRegistry)
+                {
+                    _logger.LogWarning(
+                        "Outbox event type {EventType} is not in Platform.Contracts EventTypeRegistry; " +
+                        "published with the deterministic fallback key {RoutingKey}. Add it to the registry.",
+                        message.EventType, routingKey);
+                }
+
                 await publisher.PublishAsync(routingKey, message.Payload, cancellationToken);
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
             }
@@ -71,12 +80,11 @@ public sealed class OutboxProcessor : BackgroundService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static string ToRoutingKey(string assemblyQualifiedEventType)
-    {
-        var shortName = assemblyQualifiedEventType.Split(',')[0].Split('.').Last();
-        var withoutSuffix = shortName.Replace("DomainEvent", string.Empty);
-        var dotted = string.Concat(withoutSuffix.Select((c, i) =>
-            i > 0 && char.IsUpper(c) ? "." + char.ToLower(c) : char.ToLower(c).ToString()));
-        return "bus." + dotted;
-    }
+    /// <summary>
+    /// Service prefix for the deterministic fallback in
+    /// <see cref="IntegrationEventRoutingKeys"/>. Known bus events resolve from
+    /// the explicit <c>Platform.Contracts.EventTypeRegistry</c>. The old munging
+    /// produced <c>bus.bus.registered</c> (P0-4) and is gone.
+    /// </summary>
+    private const string ServicePrefix = "bus";
 }

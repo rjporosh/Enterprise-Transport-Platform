@@ -74,6 +74,51 @@ services:
     ports:
       - "8080:8080"
 
+  # --- API Gateway (M0) ---
+  # The SINGLE public entry point. Both frontends' nginx proxy /api/v1/* here;
+  # no browser client talks to an individual service any more. YARP routing +
+  # correlation-id + tenant-header hygiene + edge rate limiting only — no
+  # business logic. Internal service addresses come from ReverseProxy__Clusters
+  # env vars (Docker DNS names). See docs/programmers-guide/gateway.md.
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: infrastructure/gateway/Dockerfile
+    container_name: bus-ticketing-api-gateway
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - booking-service
+      - bus-service
+      - route-service
+      - payment-service
+      - notification-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:8080"
+      # Same shared dev key as every service below (local dev/demo only —
+      # production injects a distinct key per the P0-12 fix in milestone M11).
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__RequireHttpsMetadata: "false"
+      ReverseProxy__Clusters__auth__Destinations__primary__Address: "http://auth-service:8080/"
+      ReverseProxy__Clusters__booking__Destinations__primary__Address: "http://booking-service:8080/"
+      ReverseProxy__Clusters__bus__Destinations__primary__Address: "http://bus-service:8080/"
+      ReverseProxy__Clusters__route__Destinations__primary__Address: "http://route-service:8080/"
+      ReverseProxy__Clusters__payment__Destinations__primary__Address: "http://payment-service:8080/"
+      ReverseProxy__Clusters__notification__Destinations__primary__Address: "http://notification-service:8080/"
+      # ticketing-service does not exist yet (milestone M6); /api/v1/tickets/* → 502 until then.
+      #
+      # ForwardedHeaders stays OFF for this isolated dev network: the gateway
+      # rate-limits on the socket peer IP. In production, set
+      # Gateway__ForwardedHeaders__Enabled=true and list the real ingress/LB
+      # IPs in Gateway__ForwardedHeaders__KnownProxies__N so X-Forwarded-For is
+      # honoured only from them (never blindly).
+      Gateway__ForwardedHeaders__Enabled: "false"
+    ports:
+      - "8088:8080"
+
   customer-web:
     build:
       context: ../../apps/angular-client/bus-ticketing-customer-web
@@ -81,9 +126,7 @@ services:
     container_name: bus-ticketing-customer-web
     restart: unless-stopped
     depends_on:
-      - booking-service
-      - auth-service
-      - payment-service
+      - api-gateway
     ports:
       - "4200:80"
 
@@ -94,10 +137,7 @@ services:
     container_name: bus-ticketing-admin-console
     restart: unless-stopped
     depends_on:
-      - booking-service
-      - auth-service
-      - bus-service
-      - route-service
+      - api-gateway
     ports:
       - "5173:80"
 

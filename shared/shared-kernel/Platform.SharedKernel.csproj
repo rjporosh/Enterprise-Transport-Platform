@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Platform.SharedKernel — cross-cutting PRIMITIVES only.
+
+    Rules (see docs/PRODUCTION-GAP-ANALYSIS.md P0-2 and .ai/MASTER-RULES.md §4/§6):
+      * No EF entities, no domain models, no service-specific types.
+      * No dependency on ASP.NET (that lives in Platform.Common).
+      * Only stable, versionable contracts every service can share safely.
+    Each service keeps its own Result/Error/DomainEvent types; these live in a
+    distinct namespace (Platform.SharedKernel.*) and are adopted incrementally,
+    never by a big-bang replacement.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>Platform.SharedKernel</RootNamespace>
+    <AssemblyName>Platform.SharedKernel</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Cross-cutting primitives (correlation, tenant context, result/error, pagination, idempotency) for the Enterprise Transport Platform.</Description>
+  </PropertyGroup>
+
+</Project>

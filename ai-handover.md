@@ -1,4 +1,149 @@
-# AI Handover — 2026-08-31 production-readiness audit (READ THIS FIRST)
+# AI Handover — 2026-09-01 · Milestone M0 complete (READ THIS FIRST)
+
+## M0 objective
+
+Establish the **shared kernel** (`shared/*`, previously empty) and a **single
+public API gateway** (`infrastructure/gateway/`, previously empty), and fix the
+RabbitMQ **routing-key** bug (P0-4) — so every later milestone applies its
+security/correctness fixes *once* at the edge / in the kernel, not six times.
+
+## What was covered / fixed
+
+| Area | Done |
+|------|------|
+| `shared/shared-kernel` (`Platform.SharedKernel`) | correlation (`CorrelationContext` AsyncLocal, `CorrelationId`, `PlatformHeaders`), `TenantContext`, `Result`/`Error`, `ApiResponse<T>`, pagination, idempotency contract, `RequestMetadata` |
+| `shared/contracts` (`Platform.Contracts`) | `EventTypes` (all routing keys), `EventTypeRegistry` (40 events), `IntegrationEventRoutingKeys` resolver, `IntegrationEvents.*V1` contract records |
+| `shared/common` (`Platform.Common`) | `CorrelationIdMiddleware`, `CorrelationPropagationHandler`, `SecurityHeadersMiddleware`, `TenantHeaderHygieneMiddleware` |
+| `infrastructure/gateway` (`Platform.Gateway`) | YARP 2.3.0, config-only routes (16) + clusters (7), correlation ingress/forward, tenant-header strip + claim re-inject, edge rate limiting (IP/user/tenant), security headers, 10 MB body cap, per-cluster timeout, passive health checks, Serilog + OTel + `/metrics`, **Production requires `Jwt:SigningKey`**, Dockerfile (non-root `app`, HEALTHCHECK), added to `docker-compose.yml` (host 8088) |
+| **Routing-key fix (P0-4)** | all 6 `OutboxProcessor`s + payment `FailedWebhookRetryJob` → `IntegrationEventRoutingKeys.Resolve`. No `ToRoutingKey`/`DeriveRoutingKey`/AQN-as-key remains |
+| RabbitMQ correlation | all 6 `RabbitMqPublisher`s set `IBasicProperties.CorrelationId` from ambient context |
+| Frontends | Angular + React: single gateway upstream (proxy + nginx + env); staging configs added; **zero direct service URLs** (grep-verified) |
+| Solutions | shared projects added to all 6 service `.sln`; new `shared/Platform.Shared.sln`, `infrastructure/gateway/Platform.Gateway.sln` |
+| Docs | `docs/programmers-guide/{gateway,messaging-contracts,correlation-id}.md`; `guide.md` first-use guide; `docs/PRODUCTION-MILESTONES.md`, `docs/API-GAPS.md`, `release-notes.md` |
+
+### Root cause of P0-4 (routing keys)
+
+The per-service derivation did `"<service>." + kebab(typeName without "DomainEvent")`.
+Event classes are entity-prefixed (`BookingConfirmedDomainEvent`), so
+`BookingConfirmed` → `booking.confirmed`, then `"booking." +` that =
+**`booking.booking.confirmed`**. Payment additionally never trimmed the
+`AssemblyQualifiedName`, so it split `"...PaymentSucceededDomainEvent, Asm,
+Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"` on `.` → garbage.
+Auth worked only because its event names aren't service-prefixed
+(`UserRegistered` → `auth.user.registered`).
+
+**Fix:** `Platform.Contracts.EventTypeRegistry` maps each CLR short name → an
+explicit `EventTypes` constant; `IntegrationEventRoutingKeys.Resolve` extracts the
+short name (AQN/FullName/bare), looks it up, and only falls back to a
+deterministic no-double-prefix key (with a `LogWarning`) for an unregistered
+event. `auth.*` constants are pinned to their existing emitted values → auth is a
+no-op.
+
+## Files / projects changed
+
+**New:** `shared/shared-kernel/*` (11 files), `shared/contracts/*` (5 + 3 test
+files), `shared/common/*` (6 files), `infrastructure/gateway/*` (Dockerfile,
+`.dockerignore`, `.sln`, `src/Platform.Gateway/*` 7 files, `tests/Platform.Gateway.Tests/*` 3),
+`tests/platform/Platform.Messaging.IntegrationTests/*` (2),
+`shared/Platform.Shared.sln`, `docs/programmers-guide/{gateway,messaging-contracts,correlation-id}.md`,
+`release-notes.md`, `apps/angular-client/.../environment.staging.ts`,
+`apps/react-admin/.../.env.{development,staging,production}`.
+
+**Modified (tracked):** 6× `*.Infrastructure.csproj` (add shared refs),
+6× `OutboxProcessor.cs`, 6× `RabbitMqPublisher.cs`, 6× `*Service.sln`,
+`payment .../Jobs/FailedWebhookRetryJob.cs`,
+`notification .../Messaging/NotificationEventConsumer.cs`,
+`infrastructure/docker/docker-compose.yml`,
+`apps/angular-client/.../{angular.json, proxy.conf.json, nginx.conf, environment.ts, environment.prod.ts}`,
+`apps/react-admin/.../{vite.config.ts, nginx.conf, .env.example, src/config/env.ts}`,
+`guide.md`, `docs/PRODUCTION-MILESTONES.md`, `docs/API-GAPS.md`, this file.
+
+**Not touched:** any `Program.cs`, endpoint, handler, entity, migration, or
+`OutboxEventPublisher` in any service. No schema change. No framework version change.
+
+## Tests executed — exact results
+
+| Suite | Result |
+|-------|--------|
+| auth/booking/bus/route/payment/notification **unit** | 37 / 16 / 15 / 28 / 32 / 27 → **155/155 pass** (unchanged baseline) |
+| `Platform.Contracts.Tests` | **226/226 pass** |
+| `Platform.Gateway.Tests` | **21/21 pass** |
+| `Platform.Messaging.IntegrationTests` (real RabbitMQ container) | **4/4 pass** |
+| `AuthService.IntegrationTests` | 7 pass, **2 fail** (`Admin_ListPermissions_ReturnsSuccess`, `SecurityQuestions_ConfigureAndVerify_ReturnsSuccess`) — **confirmed identical on the clean pre-M0 baseline via `git stash`; pre-existing, unrelated to M0** |
+| Gateway Docker image | builds 372 MB, runs non-root `app` uid 1654, `/health` 200 |
+| End-to-end (gateway image + stub): routing, correlation preserve, `X-Tenant-Id` strip | verified |
+| Angular / React `npm run build` | both succeed (prod + Angular staging) |
+| `docker compose config` | valid |
+
+Integration tests for booking/bus/route/payment/notification were **not run this
+pass** (each spins its own Testcontainers stack, ~45 s+ each, and none touch the
+routing-key/correlation code paths changed here). Command to run later:
+`dotnet test services/<svc>-service/tests/<Svc>Service.IntegrationTests`.
+
+## Security decisions
+
+- Gateway is an auth **boundary, not a gate** — it validates the JWT to read
+  claims but never rejects anonymous requests (services decide). Bad/expired
+  tokens are treated as anonymous (`OnAuthenticationFailed → NoResult`).
+- Gateway **fails to start in Production without `Jwt:SigningKey`** — otherwise it
+  would use unvalidated claims for tenant/rate-limit decisions.
+- `TenantHeaderHygieneMiddleware` strips client tenant headers **unconditionally**,
+  re-injects only from a validated claim.
+- `appsettings.Development.json` dev signing key = same dev key already committed
+  repo-wide for services. Per-service prod keys → M11.
+
+## Known limitations / intentionally deferred
+
+Redis rate limiter → M9 · OTLP collector/Jaeger/Grafana → M8 · outbox
+`CorrelationId` column + end-to-end message correlation → M2/M9 · consumer inbox
+de-dup → M7 · services adopting `shared/common` middleware + outbound
+`CorrelationPropagationHandler` → M9/ongoing · pre-existing `auth`/`payment`
+Dockerfile `useradd -u 1000` bug (fails on .NET 10 Ubuntu image) → M11 ·
+booking `InitialCreate` migration → M2 · EF Core 9→10 for notification → M7.
+
+## Current git state
+
+Milestone M0 committed as **`feat(platform): implement M0 shared kernel and YARP
+gateway`** on `main` (single commit). `git status` clean. `.git` history intact
+(no rewrite, no force). Previous commit: `19bb5b4f` (the audit).
+
+## Next milestone: **M1 — Auth hardening**
+
+Scope (see `docs/PRODUCTION-MILESTONES.md` → M1): tenant + permission claims in
+the JWT (`JwtTokenService`), `ICurrentUser` implemented and enforced, production
+first-admin path, SPA token refresh, customer OTP UI.
+
+### Exact command for the next agent
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+
+# 1. confirm state
+git log --oneline -3
+git status
+dotnet test shared/Platform.Shared.sln infrastructure/gateway/Platform.Gateway.sln
+
+# 2. read the plan + the M0 outputs you'll build on
+sed -n '/## M1 — Auth hardening/,/## M2 —/p' docs/PRODUCTION-MILESTONES.md
+cat docs/programmers-guide/correlation-id.md          # TenantContext lives in Platform.SharedKernel
+sed -n '1,80p' shared/shared-kernel/Tenancy/TenantContext.cs
+
+# 3. inspect the M1 targets BEFORE editing
+cat services/auth-service/src/AuthService.Infrastructure/Security/JwtTokenService.cs
+grep -rn "ICurrentUser" services/booking-service services/payment-service   # interface exists, 0 impls
+ls apps/angular-client/bus-ticketing-customer-web/src/app/core/auth
+```
+
+Then implement M1 following the same loop: build → run existing tests (must stay
+green: 155 unit + 251 platform) → add M1 tests → docs → single commit
+`feat(auth): implement M1 ...` → STOP. Do **not** start M2. Do **not** touch
+`.git` history. The `TenantHeaderHygieneMiddleware` in the gateway already reads
+`tenant_id` / `company_id` / `organization_id` claims — M1 just needs
+`JwtTokenService` to emit them.
+
+---
+
+# AI Handover — 2026-08-31 production-readiness audit
 
 ## What this pass did
 

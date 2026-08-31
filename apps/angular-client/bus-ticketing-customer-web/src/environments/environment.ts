@@ -1,16 +1,16 @@
 export const environment = {
   production: false,
-  // Relative — routed by the Angular CLI dev-server proxy (see
-  // proxy.conf.json) to the correct backend service per path prefix, the
-  // same way nginx.conf routes it in the production container. No gateway
-  // exists yet (see infrastructure/gateway/, currently an empty
-  // placeholder), so each service is proxied individually.
+  // Relative — every API call is proxied by `ng serve` (see proxy.conf.json)
+  // to the ONE platform API gateway (YARP), which owns routing to the
+  // individual backend services. There are no direct service URLs in this app
+  // any more (M0). In the production container, nginx.conf proxies the same
+  // /api/v1 prefix to the gateway.
   apiBaseUrl: '/api/v1',
-  // All of auth-service, booking-service, bus-service, payment-service,
-  // route-service and notification-service are now implemented and wired
-  // (see infrastructure/docker/docker-compose.yml) — mockApiInterceptor is
-  // off so this app talks to them for real. Every feature/service already
-  // calls HttpClient against the real REST contract, so nothing else
-  // changes; flip back to true for a backend-less demo/click-through.
+  // mockApiInterceptor is off — this app talks to the real backend via the
+  // gateway. Flip to true for a backend-less demo/click-through. Two paths
+  // (GET /bookings/mine, POST /payments/{id}/confirm) still fall back to the
+  // in-app mock even in real mode because no backend endpoint exists yet —
+  // see src/app/core/interceptors/mock-api.interceptor.ts and
+  // docs/API-GAPS.md (tracked for milestone M2/M3).
   mockApi: false
 };

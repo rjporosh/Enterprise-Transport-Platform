@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Platform.Contracts.Messaging;
 
 namespace AuthService.Infrastructure.Persistence.Outbox;
 
@@ -61,7 +62,15 @@ public sealed class OutboxProcessor : BackgroundService
         {
             try
             {
-                var routingKey = ToRoutingKey(message.EventType);
+                IntegrationEventRoutingKeys.TryResolve(message.EventType, ServicePrefix, out var routingKey, out var fromRegistry);
+                if (!fromRegistry)
+                {
+                    _logger.LogWarning(
+                        "Outbox event type {EventType} is not in Platform.Contracts EventTypeRegistry; " +
+                        "published with the deterministic fallback key {RoutingKey}. Add it to the registry.",
+                        message.EventType, routingKey);
+                }
+
                 await publisher.PublishAsync(routingKey, message.Payload, cancellationToken);
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
             }
@@ -76,14 +85,12 @@ public sealed class OutboxProcessor : BackgroundService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>"AuthService.Domain.Events.UserRegisteredDomainEvent, ..." -&gt; "auth.user.registered"</summary>
-    private static string ToRoutingKey(string assemblyQualifiedEventType)
-    {
-        var shortName = assemblyQualifiedEventType.Split(',')[0].Split('.').Last();
-        var withoutSuffix = shortName.Replace("DomainEvent", string.Empty);
-        var dotted = string.Concat(withoutSuffix.Select((c, i) =>
-            i > 0 && char.IsUpper(c) ? "." + char.ToLower(c) : char.ToLower(c).ToString()));
-        // "UserRegistered" -> "user.registered"; "UserLoggedIn" -> "user.logged.in"
-        return "auth." + dotted;
-    }
+    /// <summary>
+    /// Service prefix for the deterministic fallback in
+    /// <see cref="IntegrationEventRoutingKeys"/>. Known auth events resolve from
+    /// the explicit <c>Platform.Contracts.EventTypeRegistry</c> (pinned to the
+    /// exact keys this service already emitted, so this change is a no-op for
+    /// auth — no regression). The old name-munging that this replaces is gone.
+    /// </summary>
+    private const string ServicePrefix = "auth";
 }

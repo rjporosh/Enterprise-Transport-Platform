@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Platform.SharedKernel.Correlation;
 using RabbitMQ.Client;
 
 namespace PaymentService.Infrastructure.Messaging;
@@ -71,6 +72,14 @@ public class RabbitMqPublisher : IMessageBusPublisher, IDisposable
             properties.ContentType = "application/json";
             properties.MessageId = Guid.NewGuid().ToString();
             properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            // Carry the ambient correlation id onto the message when one exists
+            // (M0). Null on the outbox background path — durable outbox
+            // correlation needs an outbox CorrelationId column, deferred to
+            // M2/M9 (see docs/programmers-guide/correlation-id.md).
+            var correlationId = CorrelationContext.Current;
+            if (!string.IsNullOrEmpty(correlationId))
+                properties.CorrelationId = correlationId;
 
             _channel.Value.BasicPublish(
                 exchange: _options.Exchange,

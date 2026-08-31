@@ -33,6 +33,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BookingService.Application\BookingService.Application.csproj" />
+    <!-- Platform shared kernel (M0): stable event routing keys + ambient correlation context. -->
+    <ProjectReference Include="..\..\..\..\shared\contracts\Platform.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\shared-kernel\Platform.SharedKernel.csproj" />
   </ItemGroup>
 
 </Project>

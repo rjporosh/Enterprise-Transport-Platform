@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NotificationService.Application.Features.Notifications.SendNotification;
 using NotificationService.Domain.Enums;
+using Platform.Contracts.Messaging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -34,14 +35,16 @@ public sealed class NotificationEventConsumer : BackgroundService
     private static readonly IReadOnlyDictionary<string, (string TemplateKey, NotificationChannel Channel)> RoutingKeyMap =
         new Dictionary<string, (string, NotificationChannel)>
         {
-            ["auth.user.registered"] = ("auth.welcome", NotificationChannel.Email),
-            ["auth.password.changed"] = ("auth.password-changed", NotificationChannel.Email),
-            ["auth.user.locked.out"] = ("auth.account-locked", NotificationChannel.Email),
-            ["booking.created"] = ("booking.held", NotificationChannel.Email),
-            ["booking.confirmed"] = ("booking.confirmed", NotificationChannel.Email),
-            ["booking.cancelled"] = ("booking.cancelled", NotificationChannel.Email),
-            ["payment.succeeded"] = ("payment.receipt", NotificationChannel.Email),
-            ["payment.failed"] = ("payment.failed", NotificationChannel.Email),
+            // Keys are the stable published routing keys from Platform.Contracts
+            // (must match RabbitMq:UpstreamBindings in appsettings).
+            [EventTypes.AuthUserRegistered] = ("auth.welcome", NotificationChannel.Email),
+            [EventTypes.AuthPasswordChanged] = ("auth.password-changed", NotificationChannel.Email),
+            [EventTypes.AuthUserLockedOut] = ("auth.account-locked", NotificationChannel.Email),
+            [EventTypes.BookingCreated] = ("booking.held", NotificationChannel.Email),
+            [EventTypes.BookingConfirmed] = ("booking.confirmed", NotificationChannel.Email),
+            [EventTypes.BookingCancelled] = ("booking.cancelled", NotificationChannel.Email),
+            [EventTypes.PaymentSucceeded] = ("payment.receipt", NotificationChannel.Email),
+            [EventTypes.PaymentFailed] = ("payment.failed", NotificationChannel.Email),
         };
 
     private readonly RabbitMqOptions _options;
