@@ -99,3 +99,15 @@ it in place; nothing here needs to be redesigned.
 Not yet attempted in this pass, in priority order if the backend gaps
 above get closed: (1) real payment confirm once tenant resolution
 exists, (2) real "my bookings" list once that endpoint exists.
+
+---
+
+## 2026-08-31 update
+
+The repo-root **`docs/API-GAPS.md`** is now the single source of truth for which
+endpoints are real / unsafe / mock-only / missing across all 6 services — read it
+instead of trusting the comment in `mock-api.interceptor.ts`. The full
+frontend + backend gap picture and the fix order are in
+`docs/PRODUCTION-GAP-ANALYSIS.md` and `docs/PRODUCTION-MILESTONES.md`. This app's
+audit findings (no token refresh, no OTP UI, no i18n, no tests, payment page is
+simulated) are in `release-notes.md` next to this file.

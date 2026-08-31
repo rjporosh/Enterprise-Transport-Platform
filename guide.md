@@ -11,7 +11,7 @@ into a service's own guide for anything specific to it.
 | Service              | Project (Infrastructure)          | DbContext            | Default schema | Default dev port |
 |-----------------------|-----------------------------------|-----------------------|-----------------|-------------------|
 | auth-service           | `AuthService.Infrastructure`       | `AuthDbContext`         | `auth`            | 5101 |
-| booking-service        | `BookingService.Infrastructure`    | `BookingDbContext`      | `booking`         | see its `launchSettings.json` |
+| booking-service        | `BookingService.Infrastructure`    | `BookingDbContext`      | `booking`         | see its `launchSettings.json` — **no migration is checked in yet; run `dotnet ef migrations add "InitialCreate"` (command below) before first use** |
 | bus-service             | `BusService.Infrastructure`        | `BusDbContext`          | `bus`              | see its `launchSettings.json` |
 | notification-service   | `NotificationService.Infrastructure`| `NotificationDbContext`| `notification`    | see its `launchSettings.json` |
 | payment-service         | `PaymentService.Infrastructure`    | `PaymentDbContext`      | `payment`          | 5003 |
@@ -176,8 +176,11 @@ together at runtime is:
    401 even though the service itself is healthy (this exact bug existed
    in payment-service and was fixed in this pass — see
    `services/payment-service/docs/new-release-notes/release-notes.md`).
-2. **The API gateway** (`infrastructure/gateway`) routes public traffic to
-   each service.
+2. **The API gateway** (`infrastructure/gateway`) is **not yet implemented** —
+   the directory is empty and there is no YARP/Ocelot project anywhere in the
+   repo. Today each frontend's own nginx (prod) / dev proxy fans requests out
+   to the individual service ports directly. Standing up a single YARP gateway
+   is milestone **M0** in [`docs/PRODUCTION-MILESTONES.md`](docs/PRODUCTION-MILESTONES.md).
 3. **RabbitMQ** carries domain events between services (each service's
    transactional outbox — see e.g.
    `services/payment-service/docs/programmers-guide/adr/0002-transactional-outbox.md`

@@ -1,5 +1,30 @@
 # Release Notes — Customer Client (Angular)
 
+## 2026-08-31 — Production-readiness audit (no code changed)
+
+A read-only whole-repo audit ran this date. Findings relevant to this app,
+recorded in `docs/PRODUCTION-GAP-ANALYSIS.md` and `docs/API-GAPS.md` at the repo
+root (the latter is now the single source of truth for endpoint gaps):
+
+- **Payment page is a simulated card form** hitting a mock-only
+  `POST /payments/{id}/confirm` — it never contacts the real payment-service and
+  no real charge occurs. Closing this needs a backend tenant-claim + safe confirm
+  (milestones M1 + M3).
+- **My Bookings** still reads from the in-app mock (`mock-api.interceptor.ts`) —
+  `GET /bookings/mine` does not exist server-side (milestone M2).
+- **No token refresh** — the app stores `refresh_token` but never uses it;
+  `/auth/refresh` exists and works. Sessions drop at the 15-minute access-token
+  expiry (milestone M1).
+- **No OTP UI** — auth-service exposes `/auth/otp/request` + `/auth/otp/verify`
+  with en/bn messages; the login flow is password-only (milestone M1).
+- **No i18n** — every string is hardcoded English; no `@angular/localize` /
+  ngx-translate (milestone M10).
+- **No tests** — no `*.spec.ts` files exist.
+- **No correlation-id header** is sent on any request.
+
+No fix was applied in the audit pass; these are tracked in
+`docs/PRODUCTION-MILESTONES.md`.
+
 ## 2026-08-20 — Real API wiring pass
 
 **Fixed**

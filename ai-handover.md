@@ -1,3 +1,76 @@
+# AI Handover — 2026-08-31 production-readiness audit (READ THIS FIRST)
+
+## What this pass did
+
+A full read-only audit of the **actual source code** of this repository (not just
+the docs) against what production bus ticketing + a multi-tenant SaaS require.
+**No production source code was created, modified, renamed or deleted.** Three new
+documents are the deliverable and are now the authoritative view of project state:
+
+- **`docs/PRODUCTION-GAP-ANALYSIS.md`** — every gap, classified P0/P1/P2/P3, each
+  with the exact file/line, current behaviour, missing requirement, production
+  risk, recommended fix, dependencies and tests. Includes the A–M summary
+  (architecture, services, completion %, findings, implementation order).
+- **`docs/PRODUCTION-MILESTONES.md`** — the ordered path to production, M0 → M11.
+- **`docs/API-GAPS.md`** — per-endpoint status for all 6 services (real / unsafe /
+  mock-only / missing) + the "frontend expects, backend missing" list. Supersedes
+  the inline mock comments in `mock-api.interceptor.ts` / `mockAdapter.ts`.
+
+Also lightly corrected in this pass (documentation only): `README.md` (stale
+"still to build" / `/swagger` / vertical-slice claims), `guide.md:179` (claimed a
+gateway that does not exist), and this file. The two frontend `release-notes.md`
+and `ai-handover.md` files got an appended audit note.
+
+## Completion estimate (audited)
+
+- **Bus ticketing ≈ 35–40%** — services scaffold and mostly self-consistent, but
+  the pay→confirm→ticket spine is not connected, payment confirm/refund/webhook
+  are unsafe, no real bKash/Nagad/QR, no "My Bookings", booking endpoints are
+  IDOR, booking has no DB schema, no gateway, no ticket generation.
+- **Overall SaaS ≈ 15–20%** — RBAC shape exists; tenancy/subscription/entitlement/
+  localization/observability/gateway/shared-kernel do not.
+
+## The P0 blockers (see the gap analysis for detail + file paths)
+
+1. No API gateway (`infrastructure/gateway/` empty; no YARP/Ocelot).
+2. `shared/common|contracts|shared-kernel` all empty — everything copy-pasted 6×.
+3. booking-service has **zero EF migrations** → schema never created at runtime.
+4. Outbox routing keys wrong in booking/bus/route/payment → only `auth.*` events
+   reach the notification consumer; booking-confirm + payment-receipt mails can't fire.
+5. payment `ConfirmPayment` marks a payment `Succeeded` from client-supplied data,
+   no provider call / signature / ownership check.
+6. payment webhook signature bypass via unknown `providerName` → `DefaultPaymentProvider`
+   returns `true`.
+7. payment refunds never call the PSP — ledger flips to `Refunded`, no money moves.
+8. notification `POST /notifications` + history endpoints are unauthenticated.
+9. booking `GET /bookings/{id}` is an IDOR (passenger PII); `ICurrentUser` has no impl.
+10. booking `CustomerId` / cancel `RequestedByCustomerId` come from the request body.
+11. payment tenant isolation is driven by a spoofable `X-Tenant-Id` header, skipped
+    when absent.
+12. Shared HMAC JWT signing key across all services; code fallbacks; notification's
+    configured key is `""`.
+13. No observability backend deployed (OTLP → dead `localhost:4317`; Prometheus
+    scrapes one wrong port).
+
+## Exact next command for the next agent
+
+Read `docs/PRODUCTION-MILESTONES.md`, then start **M0** (shared kernel + YARP
+gateway skeleton). Do not start M1+ before M0 — the security fixes in M2/M3 are
+meant to be applied once in the shared kernel, not 6× per service.
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+sed -n '1,60p' docs/PRODUCTION-MILESTONES.md         # M0 scope
+git log --oneline -5                                  # confirm HEAD is the audited commit
+```
+
+Milestone workflow (per MASTER-RULES §90): build affected projects → run their
+xUnit unit + integration suites → add the tests the milestone lists → update
+`docs/programmers-guide/` → professional commit → continue. Never touch `.git`
+history. Never regenerate the 5 existing services' migrations — add new ones only.
+
+---
+
 # AI Handover — ROOT (READ THIS FIRST — points to the current session)
 
 **2026-08-20 frontend real-API wiring pass** — see

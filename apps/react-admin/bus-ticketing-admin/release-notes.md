@@ -1,5 +1,27 @@
 # Release Notes — Admin Console (React)
 
+## 2026-08-31 — Production-readiness audit (no code changed)
+
+A read-only whole-repo audit ran this date. Findings relevant to this app are in
+`docs/PRODUCTION-GAP-ANALYSIS.md` and `docs/API-GAPS.md` at the repo root
+(`API-GAPS.md` is now the single source of truth for endpoint gaps, superseding
+the top-of-file comment in `src/api/mockAdapter.ts`):
+
+- **Still mock-only** (no backend endpoint): `GET /dashboard/stats`, `GET /users`,
+  `GET /bookings` (list), `GET /trips` (list). Tracked in milestones M1/M2.
+- **No token refresh** — `admin_refresh_token` is stored but never used; sessions
+  drop at the 15-minute access-token expiry (milestone M1).
+- **No i18n** — hardcoded English only (milestone M10).
+- **No tests** — no test files or test runner configured.
+- **No correlation-id header** on requests.
+- **Stale code comment**: `src/modules/buses/api/buses.api.ts:37` refers to
+  `src/modules/operators` as "UI scaffolding" — that directory does not exist.
+- First-admin bootstrapping still requires the manual SQL step (or the env-gated
+  `DevAdminBootstrapper`) — see this folder's `ai-handover.md`.
+
+No fix was applied in the audit pass; these are tracked in
+`docs/PRODUCTION-MILESTONES.md`.
+
 ## 2026-08-20 — Real API wiring pass
 
 **Fixed**

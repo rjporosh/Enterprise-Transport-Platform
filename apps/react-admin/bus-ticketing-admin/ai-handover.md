@@ -139,3 +139,15 @@ Not yet attempted in this pass, in priority order if more time is
 available: (1) `users` module against a real backend once one exists,
 (2) `dashboard` stats once an aggregation endpoint exists, (3) an
 operator-directory lookup for the Buses table once one exists.
+
+---
+
+## 2026-08-31 update
+
+The repo-root **`docs/API-GAPS.md`** is now the single source of truth for which
+endpoints are real / unsafe / mock-only / missing across all 6 services — read it
+instead of trusting the top-of-file comment in `src/api/mockAdapter.ts`. The full
+gap picture and the fix order are in `docs/PRODUCTION-GAP-ANALYSIS.md` and
+`docs/PRODUCTION-MILESTONES.md`. This app's audit findings (no token refresh, no
+i18n, no tests, stale `operators` comment) are in `release-notes.md` next to this
+file.
