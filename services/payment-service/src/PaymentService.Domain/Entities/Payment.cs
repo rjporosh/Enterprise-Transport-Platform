@@ -136,7 +136,7 @@ public sealed class Payment : AggregateRoot
         ProviderReference = providerTransactionId ?? ProviderReference;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        Raise(new PaymentSucceededDomainEvent(Id, TenantId, ProviderReference ?? string.Empty, ProviderPaymentId, UpdatedAtUtc.Value));
+        Raise(new PaymentSucceededDomainEvent(Id, TenantId, CustomerId, OrderReference, ProviderReference ?? string.Empty, ProviderPaymentId, UpdatedAtUtc.Value));
     }
 
     public void Fail(string reason, string? providerErrorCode = null)
@@ -149,7 +149,7 @@ public sealed class Payment : AggregateRoot
         FailureCode = providerErrorCode;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        Raise(new PaymentFailedDomainEvent(Id, TenantId, reason, providerErrorCode, UpdatedAtUtc.Value));
+        Raise(new PaymentFailedDomainEvent(Id, TenantId, CustomerId, OrderReference, reason, providerErrorCode, UpdatedAtUtc.Value));
     }
 
     public void Cancel(string? reason = null)

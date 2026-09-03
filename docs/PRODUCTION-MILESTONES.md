@@ -387,8 +387,9 @@ no secret literal in the repo; all 6 images non-root with a healthcheck.
 | Milestone | Status | Commit |
 |-----------|--------|--------|
 | M0 Shared kernel + gateway | ✅ Done (2026-09-01) | feat(platform): implement M0 shared kernel and YARP gateway |
-| M1 Auth hardening | Not started | |
-| M2 Booking correctness | Not started | |
+| M1 Auth hardening | 🟡 Partial (2026-09-03) — `tenant_id` + `customer_id` + `phone_number` claims in the access token; claims-based `ICurrentUser` in booking-service. Remaining: `perms` claim, SPA refresh interceptor, OTP UI, production first-admin script. | feat(booking): M2 slice + auth claims |
+| M2 Booking correctness | 🟡 Substantially done (2026-09-03) — `InitialCreate` migration; per-seat `xmin` concurrency; `PaymentEventConsumer` (payment.succeeded→confirm, payment.failed→release) + inbox dedup; `ExpiredHoldSweepJob` (Quartz); `GET /bookings/mine` + admin `GET /bookings`; ownership 404 on `GET /bookings/{id}` + cancel; `CustomerId`/contact from token not body; admin trip CRUD (`POST/GET /trips`, `GET /trips/{id}` seat map); DB-provider factory + file query/runtime logs. Remaining: booking IntegrationTests for the consumer + job; NBomber concurrency proof. | feat(booking): M2 — migrations, read-model, trip mgmt, payment-driven confirm |
+
 | M3 Payment safety | Not started | |
 | M4 Real bKash | Not started | |
 | M5 Real Nagad | Not started | |

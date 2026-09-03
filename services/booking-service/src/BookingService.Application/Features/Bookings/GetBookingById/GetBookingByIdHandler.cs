@@ -19,7 +19,10 @@ public sealed class GetBookingByIdHandler : IRequestHandler<GetBookingByIdQuery,
             .Include(b => b.Seats)
             .FirstOrDefaultAsync(b => b.Id == request.BookingId, cancellationToken);
 
-        if (booking is null)
+        // Ownership check folded into the "not found" path on purpose: a
+        // customer asking for someone else's booking must not be able to tell
+        // it exists.
+        if (booking is null || (!request.IsAdmin && booking.CustomerId != request.RequestedByCustomerId))
             throw new BookingNotFoundException(request.BookingId);
 
         return new BookingDto(

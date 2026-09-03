@@ -48,7 +48,7 @@ public class CreateBookingHandlerTests : IDisposable
     public async Task Handle_WithAvailableSeats_CreatesBooking_HoldsSeats_AndEnqueuesOutboxEvent()
     {
         var handler = CreateHandler();
-        var command = new CreateBookingCommand(_tripId, Guid.NewGuid(),
+        var command = new CreateBookingCommand(_tripId, Guid.NewGuid(), "c@example.com", "Porosh Ahmed", null,
             new[] { new PassengerDto("A1", "Porosh Ahmed", 30, "Male") });
 
         var result = await handler.Handle(command, CancellationToken.None);
@@ -67,12 +67,12 @@ public class CreateBookingHandlerTests : IDisposable
     {
         var firstHandler = CreateHandler();
         await firstHandler.Handle(
-            new CreateBookingCommand(_tripId, Guid.NewGuid(), new[] { new PassengerDto("A1", "First Customer", 30, "Male") }),
+            new CreateBookingCommand(_tripId, Guid.NewGuid(), "a@example.com", "First Customer", null, new[] { new PassengerDto("A1", "First Customer", 30, "Male") }),
             CancellationToken.None);
 
         var secondHandler = CreateHandler();
         var act = () => secondHandler.Handle(
-            new CreateBookingCommand(_tripId, Guid.NewGuid(), new[] { new PassengerDto("A1", "Second Customer", 25, "Female") }),
+            new CreateBookingCommand(_tripId, Guid.NewGuid(), "b@example.com", "Second Customer", null, new[] { new PassengerDto("A1", "Second Customer", 25, "Female") }),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<SeatUnavailableException>();
@@ -82,7 +82,7 @@ public class CreateBookingHandlerTests : IDisposable
     public async Task Handle_WhenTripDoesNotExist_ThrowsTripNotFoundException()
     {
         var handler = CreateHandler();
-        var command = new CreateBookingCommand(Guid.NewGuid(), Guid.NewGuid(),
+        var command = new CreateBookingCommand(Guid.NewGuid(), Guid.NewGuid(), "c@example.com", "Porosh Ahmed", null,
             new[] { new PassengerDto("A1", "Porosh Ahmed", 30, "Male") });
 
         var act = () => handler.Handle(command, CancellationToken.None);

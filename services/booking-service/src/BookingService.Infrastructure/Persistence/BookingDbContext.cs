@@ -1,6 +1,7 @@
 using System.Reflection;
 using BookingService.Application.Common.Interfaces;
 using BookingService.Domain.Entities;
+using BookingService.Infrastructure.Persistence.Inbox;
 using BookingService.Infrastructure.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public sealed class BookingDbContext : DbContext, IBookingDbContext
     public DbSet<Route> Routes => Set<Route>();
     public DbSet<Bus> Buses => Set<Bus>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

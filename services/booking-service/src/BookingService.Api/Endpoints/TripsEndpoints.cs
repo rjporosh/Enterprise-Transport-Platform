@@ -1,4 +1,7 @@
 using System.Text.Json;
+using BookingService.Application.Features.Trips.CreateTrip;
+using BookingService.Application.Features.Trips.GetTripById;
+using BookingService.Application.Features.Trips.GetTrips;
 using BookingService.Application.Features.Trips.SearchTrips;
 using MediatR;
 
@@ -13,6 +16,7 @@ public static class TripsEndpoints
     {
         var group = app.MapGroup("/api/v1/trips").WithTags("Trips");
 
+        // ---- Public search -------------------------------------------------
         group.MapGet("/search", async (
                 string origin,
                 string destination,
@@ -23,21 +27,14 @@ public static class TripsEndpoints
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                // If the caller omits page/pageSize entirely, fall back to
-                // page 1 / 10 results per page rather than returning
-                // everything unpaginated.
                 var effectivePage = page is null or <= 0 ? DefaultPage : page.Value;
                 var effectivePageSize = pageSize is null or <= 0 ? DefaultPageSize : pageSize.Value;
 
-                var query = new SearchTripsQuery(origin, destination, date, effectivePage, effectivePageSize);
-                var result = await sender.Send(query, cancellationToken);
+                var result = await sender.Send(
+                    new SearchTripsQuery(origin, destination, date, effectivePage, effectivePageSize),
+                    cancellationToken);
 
-                // Pagination metadata goes in a response header (X-Pagination),
-                // the same pattern used across the platform's other list
-                // endpoints — keeps the JSON body as just the data, and lets
-                // clients that don't care about paging ignore the header
-                // entirely. See docs/API_PAGINATION.md for the exact shape.
-                var paginationHeader = JsonSerializer.Serialize(new
+                httpContext.Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
                 {
                     currentPage = result.Page,
                     pageSize = result.PageSize,
@@ -45,20 +42,57 @@ public static class TripsEndpoints
                     totalPages = result.TotalPages,
                     hasPrevious = result.Page > 1,
                     hasNext = result.Page < result.TotalPages
-                });
-                httpContext.Response.Headers.Append("X-Pagination", paginationHeader);
+                }));
                 httpContext.Response.Headers.Append("X-Total-Count", result.TotalCount.ToString());
 
                 return Results.Ok(result);
             })
             .WithName("SearchTrips")
             .WithSummary("Search scheduled trips between two cities on a given date.")
-            .WithDescription(
-                "Public, unauthenticated — anyone can browse trips before signing in. " +
-                "Results are cached in Redis for 30s per (origin, destination, date, page, pageSize) " +
-                "combination. Omit page/pageSize to get page 1 of 10 results; pagination metadata " +
-                "is also returned in the X-Pagination response header. " +
-                "Example: /api/v1/trips/search?origin=Dhaka&destination=Chattogram&date=2026-08-15")
+            .WithDescription("Public, unauthenticated. Cached in Redis for 30s per (origin, destination, date, page, pageSize). " +
+                             "Example: /api/v1/trips/search?origin=Dhaka&destination=Chattogram&date=2026-09-20")
+            .Produces<object>(StatusCodes.Status200OK);
+
+        // ---- Seat map (public — customers browse before signing in) -------
+        group.MapGet("/{tripId:guid}", async (Guid tripId, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var trip = await sender.Send(new GetTripByIdQuery(tripId), cancellationToken);
+                return Results.Ok(trip);
+            })
+            .WithName("GetTripById")
+            .WithSummary("Full seat map for one trip (every seat + Available/Held/Booked status).")
+            .Produces<TripDetailDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // ---- Admin: schedule + list --------------------------------------
+        var admin = app.MapGroup("/api/v1/trips").WithTags("Trips (admin)")
+            .RequireAuthorization(policy => policy.RequireRole("Admin", "Operator"));
+
+        admin.MapPost("/", async (CreateTripCommand command, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var trip = await sender.Send(command, cancellationToken);
+                return Results.Created($"/api/v1/trips/{trip.TripId}", trip);
+            })
+            .WithName("CreateTrip")
+            .WithSummary("Schedule a departure of a bus along a route (generates seat inventory).")
+            .WithDescription("Requires the Admin or Operator role. Route + bus reference data is carried inline and " +
+                             "upserted into booking-service's local read-model.")
+            .Produces<TripDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        admin.MapGet("/", async (
+                Guid? routeId, DateOnly? fromDate, DateOnly? toDate, int? page, int? pageSize,
+                ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new GetTripsQuery(routeId, fromDate, toDate, page ?? 1, pageSize ?? 20),
+                    cancellationToken);
+                return Results.Ok(result);
+            })
+            .WithName("GetTrips")
+            .WithSummary("List scheduled trips (admin / operator).")
             .Produces<object>(StatusCodes.Status200OK);
 
         return app;

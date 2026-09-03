@@ -1,10 +1,15 @@
+using BookingService.Infrastructure.Observability.FileLogging;
+using Platform.SharedKernel.Correlation;
+
 namespace BookingService.Api.Middleware;
 
 /// <summary>
-/// Ensures every request/response carries an X-Correlation-Id, generating
-/// one if the caller (or upstream gateway) didn't supply it. Pushed into
-/// Serilog's LogContext so every log line for this request is correlatable
-/// across services in the trace/log aggregator.
+/// Ensures every request/response carries an <c>X-Correlation-Id</c>,
+/// generating one if the caller (or the gateway) didn't supply it. Pushes it
+/// into Serilog's <c>LogContext</c>, the platform's ambient
+/// <see cref="CorrelationContext"/>, and the query-log
+/// <see cref="CurrentRequestContext"/> (alongside the endpoint name) so every
+/// log line and every logged SQL statement for this request is correlatable.
 /// </summary>
 public sealed class CorrelationIdMiddleware
 {
@@ -20,10 +25,25 @@ public sealed class CorrelationIdMiddleware
             : Guid.NewGuid().ToString();
 
         context.Response.Headers[HeaderName] = correlationId;
+        context.Items[HeaderName] = correlationId;
 
+        var endpointName = context.GetEndpoint()?.DisplayName ?? $"{context.Request.Method} {context.Request.Path}";
+        CurrentRequestContext.SetEndpoint(endpointName);
+        CurrentRequestContext.SetCorrelationId(correlationId);
+
+        using (CorrelationContext.BeginScope(correlationId))
         using (Serilog.Context.LogContext.PushProperty("CorrelationId", correlationId))
         {
-            await _next(context);
+            try
+            {
+                await _next(context);
+            }
+            finally
+            {
+                CurrentRequestContext.SetEndpoint(null);
+                CurrentRequestContext.SetHandler(null);
+                CurrentRequestContext.SetCorrelationId(null);
+            }
         }
     }
 }

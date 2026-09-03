@@ -27,8 +27,18 @@ public sealed class JwtTokenService : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(JwtRegisteredClaimNames.Iat, ((DateTimeOffset)now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new("first_name", user.FirstName),
-            new("last_name", user.LastName)
+            new("last_name", user.LastName),
+            // Every authenticated principal is also a potential customer; downstream
+            // services (booking, payment, ticketing) key ownership off customer_id.
+            new("customer_id", user.Id.ToString()),
+            // Single-tenant until M10 (SaaS foundation) — the platform default
+            // tenant. The gateway's TenantHeaderHygieneMiddleware re-injects
+            // X-Tenant-Id from this claim; downstream services read it for
+            // isolation filters. See docs/PRODUCTION-MILESTONES.md M10 / M1.
+            new("tenant_id", _options.DefaultTenantId)
         };
+        if (!string.IsNullOrWhiteSpace(user.PhoneNumber))
+            claims.Add(new global::System.Security.Claims.Claim("phone_number", user.PhoneNumber));
         claims.AddRange(roles.Select(role => new global::System.Security.Claims.Claim(ClaimTypes.Role, role)));
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));

@@ -7,9 +7,12 @@ public sealed class CreateBookingValidator : AbstractValidator<CreateBookingComm
     public CreateBookingValidator()
     {
         RuleFor(x => x.TripId).NotEmpty();
-        RuleFor(x => x.CustomerId).NotEmpty();
+        RuleFor(x => x.CustomerId).NotEmpty().WithMessage("You must be signed in to book.");
+        RuleFor(x => x.CustomerEmail).NotEmpty().EmailAddress();
+        RuleFor(x => x.CustomerName).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Passengers).NotEmpty().WithMessage("At least one passenger is required.");
-        RuleFor(x => x.Passengers).Must(p => p.Select(x => x.SeatNumber).Distinct().Count() == p.Count)
+        RuleFor(x => x.Passengers)
+            .Must(p => p.Select(x => x.SeatNumber).Distinct().Count() == p.Count)
             .WithMessage("Duplicate seat numbers requested in the same booking.")
             .When(x => x.Passengers is not null);
 

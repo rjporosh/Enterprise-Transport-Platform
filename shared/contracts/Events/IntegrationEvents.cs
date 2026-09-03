@@ -58,6 +58,23 @@ public sealed record BookingConfirmedV1 : IntegrationEventBase, IIntegrationEven
     public required Guid BookingId { get; init; }
     public required Guid TripId { get; init; }
     public required Guid CustomerId { get; init; }
+    public required Guid PaymentId { get; init; }
+
+    // Journey + customer snapshot so ticketing can issue and notification can
+    // deliver a ticket without calling back into booking / route / bus / auth.
+    public required string CustomerEmail { get; init; }
+    public required string CustomerName { get; init; }
+    public string? CustomerPhone { get; init; }
+    public required string OriginCity { get; init; }
+    public required string DestinationCity { get; init; }
+    public required DateTimeOffset DepartureUtc { get; init; }
+    public required DateTimeOffset ArrivalUtc { get; init; }
+    public required string BusPlateNumber { get; init; }
+    public required string BusType { get; init; }
+    public required IReadOnlyCollection<string> SeatNumbers { get; init; }
+    public required IReadOnlyCollection<string> PassengerNames { get; init; }
+    public required decimal TotalAmount { get; init; }
+    public required string Currency { get; init; }
 }
 
 /// <summary><see cref="Platform.Contracts.Messaging.EventTypes.BookingCancelled"/></summary>
@@ -83,6 +100,10 @@ public sealed record PaymentSucceededV1 : IntegrationEventBase, IIntegrationEven
 
     public required Guid PaymentId { get; init; }
     public required Guid TenantId { get; init; }
+    public required Guid CustomerId { get; init; }
+
+    /// <summary>The originating booking id (Payment.OrderReference).</summary>
+    public required string OrderReference { get; init; }
     public required string ProviderReference { get; init; }
     public string? ProviderTransactionId { get; init; }
 }
@@ -95,6 +116,10 @@ public sealed record PaymentFailedV1 : IntegrationEventBase, IIntegrationEventCo
 
     public required Guid PaymentId { get; init; }
     public required Guid TenantId { get; init; }
+    public required Guid CustomerId { get; init; }
+
+    /// <summary>The originating booking id (Payment.OrderReference).</summary>
+    public required string OrderReference { get; init; }
     public required string Reason { get; init; }
     public string? ProviderErrorCode { get; init; }
 }

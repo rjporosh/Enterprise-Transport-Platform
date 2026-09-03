@@ -65,7 +65,21 @@ public sealed class RoutingKeyDeliveryTests : IAsyncLifetime
         var domainEvent = new BookingConfirmedDomainEvent(
             BookingId: Guid.NewGuid(),
             TripId: Guid.NewGuid(),
-            CustomerId: Guid.NewGuid());
+            CustomerId: Guid.NewGuid(),
+            PaymentId: Guid.NewGuid(),
+            CustomerEmail: "customer@example.com",
+            CustomerName: "Test Customer",
+            CustomerPhone: null,
+            OriginCity: "Dhaka",
+            DestinationCity: "Chattogram",
+            DepartureUtc: DateTimeOffset.UtcNow.AddHours(4),
+            ArrivalUtc: DateTimeOffset.UtcNow.AddHours(10),
+            BusPlateNumber: "DHK-METRO-11-2345",
+            BusType: "AC Sleeper",
+            SeatNumbers: new[] { "1A", "1B" },
+            PassengerNames: new[] { "Test Customer", "Guest" },
+            TotalAmount: 1600m,
+            Currency: "BDT");
         var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
 
         var routingKey = IntegrationEventRoutingKeys.Resolve(

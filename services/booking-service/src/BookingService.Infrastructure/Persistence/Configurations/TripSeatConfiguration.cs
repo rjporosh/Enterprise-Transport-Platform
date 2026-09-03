@@ -14,6 +14,15 @@ public sealed class TripSeatConfiguration : IEntityTypeConfiguration<TripSeat>
         builder.Property(x => x.Deck).HasMaxLength(10);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
 
+        // Per-seat optimistic concurrency — two customers racing for the same
+        // seat conflict on the second commit (see TripSeat.Version). Mapped to
+        // Postgres' native xmin so there is no extra column to maintain.
+        builder.Property(x => x.Version)
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRowVersion();
+
         builder.HasIndex(x => new { x.TripId, x.SeatNumber }).IsUnique();
     }
 }

@@ -1,7 +1,10 @@
 using System.Text;
+using BookingService.Api.Diagnostics;
 using BookingService.Api.Endpoints;
 using BookingService.Api.Middleware;
+using BookingService.Api.Security;
 using BookingService.Application;
+using BookingService.Application.Common.Interfaces;
 using BookingService.Infrastructure;
 using BookingService.Infrastructure.Observability;
 using BookingService.Infrastructure.Persistence;
@@ -108,6 +111,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+// Caller identity from the validated JWT (customer id, tenant, contact, roles).
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+
 // --- API documentation: native OpenAPI + Scalar only -------------------------
 // Swashbuckle/Swagger is deliberately NOT used here: on .NET 10, Swashbuckle
 // (still built against the OpenAPI.NET v1 object model) and the framework's
@@ -146,8 +153,11 @@ builder.Services.AddHealthChecks()
 var app = builder.Build();
 
 // --- Middleware pipeline -----------------------------------------------
-app.UseMiddleware<ExceptionHandlingMiddleware>();
+// Correlation first so the exception handler (and every log line / query
+// log) can record the correlation id; exception handler next so it wraps
+// auth, routing and the endpoints.
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 
 app.MapOpenApi();                          // -> /openapi/v1.json
@@ -172,14 +182,30 @@ app.MapPrometheusScrapingEndpoint("/metrics");
 // silently does nothing and every request will fail with "relation does not
 // exist", which is the other very likely cause of "builds fine, doesn't
 // actually work end-to-end".
-if (app.Environment.IsDevelopment())
+try
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
-    await db.Database.MigrateAsync();
-}
+    if (app.Environment.IsDevelopment())
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BookingDbContext>();
+        await db.Database.MigrateAsync();
+    }
 
-app.Run();
+    app.Run();
+}
+catch (Exception ex)
+{
+    // Anything that kills startup (unreachable Postgres, missing migration,
+    // port in use) is written to logs/runtime-errors/ with a diagnosed root
+    // cause + suggested fix before the process exits non-zero.
+    var path = RuntimeErrorLogWriter.Write(ex, app.Environment.ContentRootPath, app.Environment.EnvironmentName);
+    Log.Fatal(ex, "booking-service failed to start. Diagnostic written to {Path}", path);
+    throw;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
 
 // Exposed for WebApplicationFactory-based integration tests.
 public partial class Program { }

@@ -35,13 +35,14 @@ public sealed class CancelBookingHandler : IRequestHandler<CancelBookingCommand>
     public async Task Handle(CancelBookingCommand request, CancellationToken cancellationToken)
     {
         var booking = await _context.Bookings
+            .Include(b => b.Seats)
             .FirstOrDefaultAsync(b => b.Id == request.BookingId, cancellationToken);
 
         if (booking is null)
             throw new BookingNotFoundException(request.BookingId);
 
-        if (booking.CustomerId != request.RequestedByCustomerId)
-            throw new InvalidBookingStateException("You are not permitted to cancel another customer's booking.");
+        if (!request.IsAdmin && booking.CustomerId != request.RequestedByCustomerId)
+            throw new BookingNotFoundException(request.BookingId);
 
         var trip = await _context.Trips
             .Include(t => t.Seats)

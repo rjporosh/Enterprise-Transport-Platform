@@ -5,6 +5,63 @@ Platform-wide release notes. Frontend apps also keep their own
 
 ---
 
+## MVP-1 (roadmap M2 + M1 slice) — booking-service end-to-end — 2026-09-03
+
+Commit: `feat(booking): M2 — migrations, read-model consumers, trip mgmt, payment-driven confirm`.
+
+### Fixed
+
+- **booking-service had no EF migrations** (P0-3) — startup `MigrateAsync()` was a
+  no-op, the schema was never created, every request failed. Added
+  `20260903113152_InitialCreate` (schema `booking`).
+- **No payment → booking-confirmation path** — a paid booking stayed `PendingPayment`
+  forever. Added `PaymentEventConsumer`: `payment.succeeded` → confirm + book seats +
+  publish `booking.confirmed`; `payment.failed` → release the hold.
+- **Seat double-booking under load** (P1-3) — added per-seat `xmin` optimistic
+  concurrency; concurrent holds on one seat now yield exactly one 409.
+- **IDOR** (P0-9, P0-10) — `CustomerId` + contact now come from the JWT, not the
+  request body; `GET /bookings/{id}` and cancel return 404 for a non-owner.
+
+### Added
+
+- Endpoints: `GET /api/v1/bookings/mine`, admin `GET /api/v1/bookings`,
+  admin `POST/GET /api/v1/trips`, public `GET /api/v1/trips/{id}` (live seat map).
+- `ExpiredHoldSweepJob` (Quartz) — releases unpaid seat holds after the 10-min window.
+- `inbox_messages` table — at-least-once consumer de-duplication.
+- **Database provider factory** in booking (`Database:Provider` = Postgres | SqlServer | MySql).
+- **File diagnostic logs** in booking: `logs/query-logs/` (structured: provider, endpoint,
+  handler, correlation, SQL, timing, params, slow-query hints), `logs/runtime-errors/`
+  (diagnosed root cause + fix), and `scripts/build-with-logs.sh` for `logs/build-errors/`.
+- auth access token: `tenant_id`, `customer_id`, `phone_number` claims (additive).
+
+### Changed
+
+- `PaymentSucceededV1` / `PaymentFailedV1` contracts gained `CustomerId` + `OrderReference`;
+  `BookingConfirmedV1` now carries the full journey + customer snapshot (for ticketing /
+  notification). Payment domain events updated to match — additive, no break.
+- booking middleware order: correlation → exception → auth.
+- booking failure responses now use the unified envelope
+  (`success/message/errors:[{code,field,message}]/traceId/timestamp`) — every validation
+  error returned, not just the first.
+
+### Operational notes
+
+- No change to any other service's runtime behaviour. Payment/notification unaffected
+  until they publish/consume the enriched events.
+- New migration to apply: `dotnet ef database update` for booking-service (see MIGRATIONS
+  section of `guide.md` / handover).
+- Local `dotnet run`: always pass `Jwt__SigningKey` explicitly so auth and booking agree
+  (compose already sets it).
+
+### Known limitations
+
+- booking IntegrationTests for the new consumer / job not yet written (unit-tested;
+  end-to-end manually verified against real containers).
+- MVP-2 (payment safety + QR), MVP-3 (ticketing), MVP-4 (notification) not started — see
+  `ai-handover.md`.
+
+---
+
 ## M0 — Shared kernel + YARP API gateway — 2026-09-01
 
 Milestone M0 of the production hardening plan

@@ -5,11 +5,31 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>BookingService.Infrastructure</RootNamespace>
+    <NoWarn>NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <!--
+      Database portability — the runtime "Database:Provider" switch in
+      DependencyInjection.cs picks which one is instantiated. Postgres is the
+      primary/default provider; the others are always referenced so switching
+      is configuration-only. See docs/programmers-guide/database-provider-factory.md.
+    -->
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <!-- Pomelo has no official EF Core 10 release yet (same as bus/auth); suppressed deliberately. -->
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" NoWarn="NU1608" />
+    <!--
+      SQLite is a supported provider name in the factory switch but its package
+      is not referenced by default: SQLitePCLRaw.lib.e_sqlite3 2.1.11 (its only
+      native asset) carries GHSA-2m69-gcr7-jv3q with no patched release yet.
+      To use it, add Microsoft.EntityFrameworkCore.Sqlite and regenerate the
+      migrations for SQLite. See docs/programmers-guide/database-provider-factory.md.
+    -->
+    <!-- Quartz.NET — ExpiredHoldSweepJob (releases unpaid seat holds). -->
+    <PackageReference Include="Quartz" Version="3.13.1" />
+    <PackageReference Include="Quartz.Extensions.Hosting" Version="3.13.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

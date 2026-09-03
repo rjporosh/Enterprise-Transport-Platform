@@ -13,6 +13,9 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 
         builder.Property(x => x.TripId).IsRequired();
         builder.Property(x => x.CustomerId).IsRequired();
+        builder.Property(x => x.CustomerEmail).HasMaxLength(256).IsRequired();
+        builder.Property(x => x.CustomerName).HasMaxLength(150).IsRequired();
+        builder.Property(x => x.CustomerPhone).HasMaxLength(32);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(x => x.CancellationReason).HasMaxLength(500);
 

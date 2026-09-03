@@ -76,6 +76,9 @@ public sealed class CreateBookingHandler : IRequestHandler<CreateBookingCommand,
         var booking = Booking.Create(
             trip.Id,
             request.CustomerId,
+            request.CustomerEmail,
+            request.CustomerName,
+            request.CustomerPhone,
             trip.BasePrice,
             request.Passengers.Select(p => (p.SeatNumber, p.FullName, p.Age, p.Gender)).ToList(),
             now);

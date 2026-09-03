@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>BookingService.Api</RootNamespace>
     <UserSecretsId>booking-service-secrets</UserSecretsId>
+    <!-- NU1608: Pomelo 9.0.0 vs EF Core 10 (deliberate — see Infrastructure.csproj).
+         Matches bus-service / route-service. -->
+    <NoWarn>NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -55,6 +58,7 @@
       <ReferenceSourceTarget></ReferenceSourceTarget>
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\..\shared\shared-kernel\Platform.SharedKernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

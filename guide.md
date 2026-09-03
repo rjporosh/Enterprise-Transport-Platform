@@ -83,8 +83,7 @@ docker compose up -d postgres postgres-auth postgres-bus postgres-route \
   postgres-payment postgres-notification rabbitmq redis mailhog
 ```
 
-Apply migrations (see the "Applying migrations" section further down — note
-**booking-service has no migration yet**, run `InitialCreate` first).
+Apply migrations (see the "Applying migrations" section further down).
 
 Run each service in its own terminal:
 
@@ -260,7 +259,7 @@ npm run build --workspace=apps/react-admin/bus-ticketing-admin
 | `/api/v1/tickets/*` returns 502 | Expected — the Ticketing service doesn't exist yet (milestone M6). |
 | Frontend can't reach the API in `ng serve` / `vite dev` | The gateway isn't running on `localhost:8080`. Start it (`dotnet run --project infrastructure/gateway/src/Platform.Gateway`) or run the Docker stack. |
 | `docker compose up` fails building `auth-service`/`payment-service` with `useradd ... exit code 4` | Pre-existing Dockerfile bug (uid 1000 collision on the .NET 10 image). Run those two with `dotnet run` for now; fix is milestone M11. |
-| Booking API returns 500 on every DB call | booking-service has **no migration**. Run `dotnet ef migrations add "InitialCreate" --project services/booking-service/src/BookingService.Infrastructure --startup-project services/booking-service/src/BookingService.Api --output-dir Migrations`, then `database update`. |
+| Booking API returns 500 on every DB call | The `booking` schema isn't created. Run `dotnet ef database update --project services/booking-service/src/BookingService.Infrastructure --startup-project services/booking-service/src/BookingService.Api`. `20260903113152_InitialCreate` is checked in. |
 | Every authenticated call → 401 across a service | `Jwt:SigningKey`/`Issuer`/`Audience` mismatch between that service and auth-service/the gateway. |
 | RabbitMQ consumer logs *"unmapped routing key"* | A new upstream event was bound in `RabbitMq:UpstreamBindings` before its `RoutingKeyMap`/template entry was added. |
 | Notification never sends despite the event arriving | No template is seeded (milestone M7). Create one via `POST /api/v1/templates`. |
@@ -273,7 +272,7 @@ npm run build --workspace=apps/react-admin/bus-ticketing-admin
 | OTLP collector + Jaeger + Prometheus + Grafana (exporters point at a dead endpoint) | M8 |
 | Correlation id carried *through the transactional outbox* to RabbitMQ | M2 / M9 |
 | Consumer inbox de-duplication (redelivered events duplicate notifications) | M7 |
-| booking-service `InitialCreate` migration + seat-hold concurrency fix | M2 |
+| booking-service `InitialCreate` migration + seat-hold concurrency fix | ✅ done 2026-09-03 (M2) |
 | Payment confirm/refund/webhook safety; real bKash / Nagad / Bangla QR | M3 / M4 / M5 |
 | Ticketing service (ticket number / QR / PDF / verification) | M6 |
 | Per-service JWT signing keys; non-root + healthcheck on every Dockerfile; CI/CD | M11 |
@@ -287,7 +286,7 @@ npm run build --workspace=apps/react-admin/bus-ticketing-admin
 | Service              | Project (Infrastructure)          | DbContext            | Default schema | Default dev port |
 |-----------------------|-----------------------------------|-----------------------|-----------------|-------------------|
 | auth-service           | `AuthService.Infrastructure`       | `AuthDbContext`         | `auth`            | 5101 |
-| booking-service        | `BookingService.Infrastructure`    | `BookingDbContext`      | `booking`         | see its `launchSettings.json` — **no migration is checked in yet; run `dotnet ef migrations add "InitialCreate"` (command below) before first use** |
+| booking-service        | `BookingService.Infrastructure`    | `BookingDbContext`      | `booking`         | `20260903113152_InitialCreate` checked in — `dotnet ef database update` before first use |
 | bus-service             | `BusService.Infrastructure`        | `BusDbContext`          | `bus`              | see its `launchSettings.json` |
 | notification-service   | `NotificationService.Infrastructure`| `NotificationDbContext`| `notification`    | see its `launchSettings.json` |
 | payment-service         | `PaymentService.Infrastructure`    | `PaymentDbContext`      | `payment`          | 5003 |

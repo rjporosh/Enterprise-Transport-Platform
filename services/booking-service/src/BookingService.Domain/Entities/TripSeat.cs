@@ -15,6 +15,18 @@ public class TripSeat : Entity
     public string Deck { get; private set; } = "Lower"; // "Lower" | "Upper"
     public SeatStatus Status { get; private set; } = SeatStatus.Available;
 
+    /// <summary>
+    /// Optimistic-concurrency token mapped to Postgres' native <c>xmin</c>
+    /// system column. Two customers racing to hold the SAME seat both read
+    /// the same <c>xmin</c>; the first commit bumps it, the second commit's
+    /// <c>WHERE xmin = &lt;stale&gt;</c> matches no row and EF raises
+    /// <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/>,
+    /// which <c>CreateBookingHandler</c> surfaces as a 409. This is what makes
+    /// the "no double-booking" guarantee hold under concurrent load — child
+    /// seat mutations do not bump the parent Trip row.
+    /// </summary>
+    public uint Version { get; set; }
+
     private TripSeat() { } // EF Core
 
     public TripSeat(Guid id, Guid tripId, string seatNumber, string deck) : base(id)

@@ -1,3 +1,98 @@
+# AI Handover — 2026-09-03 · MVP-1 (roadmap M2 + M1 slice) — booking works end-to-end (READ THIS FIRST)
+
+## What this pass delivered
+
+The **booking-service was dead** (zero EF migrations → no tables → every request
+failed; nothing populated Trips/Routes/Buses; no payment→confirm path). It now
+runs a **verified end-to-end reservation lifecycle**.
+
+| Area | Done |
+|------|------|
+| **booking-service migration** | `20260903113152_InitialCreate` (schema `booking`) — was missing entirely (P0-3). `dotnet ef database update` now builds the schema. |
+| **Reservation lifecycle** | `PaymentEventConsumer` (`BackgroundService`) binds `payment.events` → on `payment.succeeded` confirms the booking + books seats + publishes `booking.confirmed` (full journey + customer snapshot: seats, passenger names, email, phone, origin/dest, times, bus, amount); on `payment.failed` releases the hold. Inbox table (`inbox_messages`) for at-least-once dedup. |
+| **Seat concurrency (P1-3)** | `TripSeat.Version` → Postgres `xmin`. Two customers racing for one seat → second gets `DbUpdateConcurrencyException` → 409. Verified in the query log (`UPDATE trip_seats … WHERE "Id"=… AND xmin=…`). |
+| **Expired holds** | `ExpiredHoldSweepJob` (Quartz, every 60 s, `[DisallowConcurrentExecution]`) → `Booking.Expire()` + release seats + `booking.cancelled`. |
+| **Identity / IDOR (P0-9, P0-10)** | `CustomerId` + email/name/phone now come from the JWT (`ClaimsCurrentUser`), never the request body. `GET /bookings/{id}` and cancel → **404** (not 403) for a non-owner. |
+| **New endpoints** | `GET /api/v1/bookings/mine` (owner-scoped, paged); `GET /api/v1/bookings` (admin, filter by status/trip/customer); `POST /api/v1/trips` + `GET /api/v1/trips` (admin/operator — schedules a departure, upserts the Route/Bus replicas inline, generates seat inventory); `GET /api/v1/trips/{id}` (**real seat map**, every seat + Available/Held/Booked). |
+| **auth-service (M1 slice)** | access token now also carries `tenant_id` (default tenant `00000000-…-0001` until M10), `customer_id`, `phone_number`. Additive — no contract break. |
+| **Cross-cutting** | DB-provider factory (`Database:Provider` = Postgres\|SqlServer\|MySql) in booking; file diagnostic logs (`services/booking-service/logs/{query-logs,runtime-errors}/`) — structured query log with provider/endpoint/handler/correlation/SQL/timing/params + slow-query suggestions; `RuntimeErrorLogWriter` with diagnosed root cause + fix; `scripts/build-with-logs.sh`. Unified failure envelope (`success/message/errors[]/traceId/timestamp`) + all validation errors, in booking's `ExceptionHandlingMiddleware`. Middleware order fixed (correlation → exception → auth). |
+| **Contracts** | `PaymentSucceededV1`/`PaymentFailedV1` gained `CustomerId` + `OrderReference` (= bookingId); `BookingConfirmedV1` gained the full journey/customer snapshot. Payment domain events updated to match (additive). |
+| Docs | `docs/programmers-guide/{database-provider-factory,logging}.md`; milestone tracker + release notes updated. |
+
+## Verified end-to-end (real Postgres + RabbitMQ + Redis containers, `dotnet run`)
+
+admin login → `POST /trips` (Dhaka→Chattogram, 8 seats) → `GET /trips/search` returns it →
+`GET /trips/{id}` shows 8 Available → customer registers/logs in → `POST /bookings` {2A,2B}
+→ seats Held, 10-min hold, `customerId` from token → publish `payment.succeeded`
+{orderReference=bookingId} on `payment.events` → **booking → Confirmed, seats → Booked,
+`booking.confirmed` published** with `SeatNumbers:["1A"]`, `CustomerEmail`, `CustomerPhone`,
+journey details → `GET /bookings/mine` shows it. Query log + inbox row confirmed.
+
+## Build / test status
+
+- `booking` / `auth` / `payment` / `shared` solutions: **0 errors, 0 new warnings**
+  (booking's 4 `SSH.NET` NU1903 in IntegrationTests are pre-existing — Testcontainers).
+- Unit tests: booking **22/22** (was 16), auth 37, payment 32, contracts 226 — all green.
+
+## What's NOT done (next agent picks up here)
+
+1. **booking IntegrationTests** for `PaymentEventConsumer` + `ExpiredHoldSweepJob` +
+   `bookings/mine` pagination + NBomber "0 double-books" concurrency proof (M2 test list).
+2. **MVP-2 = roadmap M3 + QR**: `ConfirmPayment` must stop trusting the request body;
+   webhook signature (`DefaultPaymentProvider.VerifyWebhookSignature => true` still there);
+   `RefundPaymentHandler` never calls the PSP; **genuine EMVCo/Bangla-QR provider**
+   (`QrPaymentProvider`, `PaymentMethodType.Qr`, `POST /payments/{id}/qr`); Nagad DFS +
+   bKash payload rewrite (credential-gated). See `docs/PRODUCTION-MILESTONES.md` M3 + the
+   plan at `~/.claude/plans/downloads-porosh-enterprise-transport-p-majestic-simon.md`.
+3. **MVP-3** = new `services/ticketing-service` (ticket + QR + QuestPDF + templates,
+   consumes `booking.confirmed`). Gateway already reserves the `ticketing` cluster +
+   `/api/v1/tickets/**`.
+4. **MVP-4** notification: seed en/bn templates, consume `ticket.issued`, auth the send
+   endpoints, BD SMS provider.
+5. **MVP-5/6** frontends, **MVP-7** seed-data.sql + guides + observability-lite.
+6. **docker-compose** main `postgres`/`rabbitmq`/`redis` bind host 5432/5672/6379 — collide
+   with other local stacks (`enterprise-*`). Consider remapping host ports (services use
+   compose DNS names internally, unaffected). Not blocking.
+7. Booking's `Program.cs` still has the fallback JWT key `dev-only-signing-key-change-me-32chars`
+   which does NOT match auth's `…-minimum` default — always pass `Jwt__SigningKey` explicitly
+   for local `dotnet run`, or run via compose (which sets it). M11 scrubs fallback literals.
+
+## Exact commands for the next agent
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+git log --oneline -3
+git status
+
+# 1. confirm the build + tests are green
+dotnet build services/booking-service/BookingService.sln services/payment-service/PaymentService.sln shared/Platform.Shared.sln
+dotnet test services/booking-service/tests/BookingService.UnitTests services/payment-service/tests/PaymentService.UnitTests
+
+# 2. bring up infra for verification (throwaway containers on free ports —
+#    the compose stack collides with the user's other running stacks on 5432/5672/6379)
+docker run -d --name bt-pg  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=booking_service -p 5542:5432 postgres:16-alpine
+docker run -d --name bt-rmq -p 5572:5672 -p 15572:15672 rabbitmq:3.13-management-alpine
+docker run -d --name bt-redis -p 6579:6379 redis:7.4-alpine
+docker exec bt-pg psql -U postgres -c "CREATE DATABASE auth_service;"
+docker exec bt-pg psql -U postgres -c "CREATE DATABASE payment_service;"
+
+# 3. migrate + run (repeat the pattern for auth + payment)
+dotnet ef database update --project services/booking-service/src/BookingService.Infrastructure \
+  --startup-project services/booking-service/src/BookingService.Api \
+  --connection "Host=localhost;Port=5542;Database=booking_service;Username=postgres;Password=postgres"
+
+# 4. read the plan + the M3 targets BEFORE editing
+sed -n '/## M3 — Payment safety/,/## M4/p' docs/PRODUCTION-MILESTONES.md
+cat services/payment-service/src/PaymentService.Application/Features/Payments/ConfirmPayment/ConfirmPaymentHandler.cs
+cat services/payment-service/src/PaymentService.Infrastructure/Providers/DefaultPaymentProvider.cs
+grep -rn "RefundAsync" services/payment-service/src   # currently invoked by nothing
+```
+
+Then implement MVP-2 → build → run existing tests (keep them green) → add the M3 tests →
+docs → single commit `feat(payment): M3 — …` → continue. Never touch `.git` history.
+
+---
+
 # AI Handover — 2026-09-01 · Milestone M0 complete (READ THIS FIRST)
 
 ## M0 objective
