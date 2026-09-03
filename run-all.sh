@@ -18,10 +18,11 @@ run_svc "bus" "BusService"
 run_svc "notification" "NotificationService"
 run_svc "payment" "PaymentService"
 run_svc "route" "RouteService"
+run_svc "ticketing" "TicketingService"
 
 echo ""
 echo "========================================"
-echo "  All 6 services starting..."
+echo "  All 7 services starting..."
 echo "  Press Ctrl+C to stop all"
 echo "========================================"
 

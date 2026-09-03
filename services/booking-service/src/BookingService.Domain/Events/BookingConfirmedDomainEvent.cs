@@ -16,6 +16,7 @@ public sealed record BookingConfirmedDomainEvent(
     Guid TripId,
     Guid CustomerId,
     Guid PaymentId,
+    Guid OperatorId,
     string CustomerEmail,
     string CustomerName,
     string? CustomerPhone,

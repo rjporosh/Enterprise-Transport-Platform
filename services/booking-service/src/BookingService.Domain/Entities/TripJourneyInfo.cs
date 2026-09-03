@@ -12,4 +12,5 @@ public sealed record TripJourneyInfo(
     DateTimeOffset DepartureUtc,
     DateTimeOffset ArrivalUtc,
     string BusPlateNumber,
-    string BusType);
+    string BusType,
+    Guid OperatorId);

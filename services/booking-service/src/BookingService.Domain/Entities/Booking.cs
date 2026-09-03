@@ -101,6 +101,7 @@ public class Booking : AggregateRoot
             TripId: TripId,
             CustomerId: CustomerId,
             PaymentId: paymentId,
+            OperatorId: journey.OperatorId,
             CustomerEmail: CustomerEmail,
             CustomerName: CustomerName,
             CustomerPhone: CustomerPhone,

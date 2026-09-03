@@ -394,7 +394,7 @@ no secret literal in the repo; all 6 images non-root with a healthcheck.
 | M4 Real bKash | Not started (bKash provider is HTTP-real but credential-gated; payload fields + real callback verification still to do) | |
 | M5 Real Nagad | Not started (Nagad needs the real DFS RSA/AES envelope rewrite) | |
 | — Genuine QR / Bangla QR | ✅ Done (2026-09-03) — `PaymentMethodType.Qr` + `QrPaymentProvider` (spec-correct EMVCo MPM payload, CRC-16, QRCoder PNG), `POST /payments/{id}/qr`, signed `POST /webhooks/qr` + audited admin `settle-qr`. Verified: customer→QR→settle→`payment.succeeded`→booking Confirmed. | feat(payment): M3 + genuine EMVCo Bangla-QR |
-| M6 Ticketing Service | Not started | |
+| M6 Ticketing Service | ✅ Done (2026-09-03) — new `services/ticketing-service` (Domain/App/Infra/Api + tests + .sln + Dockerfile). Consumes `booking.confirmed` (inbox dedup, idempotent) → issues a `Ticket` (checksummed number + opaque verification code) → renders an A5 **QuestPDF** with a QR to `/api/v1/tickets/verify/{code}` → emits `ticket.issued`. Endpoints: `/tickets/{mine,{id},{id}/pdf,verify/{code},cancel,reissue}` + `/ticket-templates` CRUD + logo upload. DB-provider factory, outbox, health, OTel, Scalar. Added to docker-compose (`postgres-ticketing`, `ticketing-service`), gateway `ticketing` cluster wired. **Verified:** book → QR pay → settle → booking Confirmed → ticket issued + 45 KB PDF + public verify + ownership 404. | feat(ticketing): M6 — new service: ticket issuance, QR, QuestPDF, templates |
 | M7 Notification production-safe | Not started | |
 | M8 Observability backend | Not started | |
 | M9 Distributed limiting + resilience | Not started | |

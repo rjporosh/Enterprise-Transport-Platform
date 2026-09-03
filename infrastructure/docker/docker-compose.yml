@@ -93,6 +93,7 @@ services:
       - route-service
       - payment-service
       - notification-service
+      - ticketing-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
@@ -108,7 +109,7 @@ services:
       ReverseProxy__Clusters__route__Destinations__primary__Address: "http://route-service:8080/"
       ReverseProxy__Clusters__payment__Destinations__primary__Address: "http://payment-service:8080/"
       ReverseProxy__Clusters__notification__Destinations__primary__Address: "http://notification-service:8080/"
-      # ticketing-service does not exist yet (milestone M6); /api/v1/tickets/* → 502 until then.
+      ReverseProxy__Clusters__ticketing__Destinations__primary__Address: "http://ticketing-service:8080/"
       #
       # ForwardedHeaders stays OFF for this isolated dev network: the gateway
       # rate-limits on the socket peer IP. In production, set
@@ -401,6 +402,48 @@ services:
     ports:
       - "5204:8080"
 
+  postgres-ticketing:
+    image: postgres:16-alpine
+    container_name: bus-ticketing-postgres-ticketing
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ticketing_service
+      POSTGRES_USER: ticketing_svc
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres-ticketing-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketing_svc -d ticketing_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ticketing-service:
+    build:
+      context: ../..
+      dockerfile: services/ticketing-service/src/TicketingService.Api/Dockerfile
+    container_name: bus-ticketing-ticketing-service
+    restart: unless-stopped
+    depends_on:
+      postgres-ticketing:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TicketingDb: "Host=postgres-ticketing;Port=5432;Database=ticketing_service;Username=ticketing_svc;Password=changeme"
+      Database__Provider: "Postgres"
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      Ticketing__PublicBaseUrl: "http://localhost:8088"
+      Jwt__Issuer: "https://identity.bus-ticketing.local"
+      Jwt__Audience: "bus-ticketing-api"
+      Jwt__SigningKey: "dev-only-signing-key-change-me-32chars-minimum"
+    ports:
+      - "5205:8080"
+
 volumes:
   postgres-data:
   postgres-notification-data:
@@ -408,3 +451,4 @@ volumes:
   postgres-payment-data:
   postgres-auth-data:
   postgres-route-data:
+  postgres-ticketing-data:

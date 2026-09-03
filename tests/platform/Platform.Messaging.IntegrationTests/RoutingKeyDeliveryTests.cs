@@ -67,6 +67,7 @@ public sealed class RoutingKeyDeliveryTests : IAsyncLifetime
             TripId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             PaymentId: Guid.NewGuid(),
+            OperatorId: Guid.NewGuid(),
             CustomerEmail: "customer@example.com",
             CustomerName: "Test Customer",
             CustomerPhone: null,

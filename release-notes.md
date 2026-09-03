@@ -5,6 +5,40 @@ Platform-wide release notes. Frontend apps also keep their own
 
 ---
 
+## MVP-3 (roadmap M6) — Ticketing Service: real ticket + QR + PDF — 2026-09-03
+
+Commit: `feat(ticketing): M6 — new service: ticket issuance, QR, QuestPDF, templates`.
+
+### Added — new `services/ticketing-service`
+
+- Consumes `booking.confirmed` → issues a `Ticket` with a checksummed number
+  (`TKT-YYMMDD-XXXXXX-C`) and an opaque verification code; idempotent + inbox-deduplicated.
+- Renders a print-ready **A5 PDF** (QuestPDF) with a QR that resolves to
+  `GET /api/v1/tickets/verify/{code}`; template-driven branding (colours, logo, terms).
+- Emits `ticket.issued` on `ticket.events` (carries contact + PDF URL for notification).
+- Endpoints: `GET /api/v1/tickets/{mine,{id},{id}/pdf}`, public
+  `GET /api/v1/tickets/verify/{code}`, `POST /tickets/{id}/{cancel,reissue}`,
+  `GET/POST/PUT /api/v1/ticket-templates` + `POST /ticket-templates/{id}/logo`.
+- DB-provider factory (Postgres default), outbox + inbox, health checks,
+  OpenTelemetry, Serilog, Scalar. `InitialCreate` migration (schema `ticketing`).
+- `docker-compose.yml`: `postgres-ticketing` (:5438) + `ticketing-service` (:5205);
+  gateway `ticketing` cluster wired (routes were already reserved).
+- `docs/programmers-guide/ticketing.md`.
+
+### Changed (additive)
+
+- `booking.confirmed` / `BookingConfirmedV1` gain `OperatorId` (for per-operator
+  templates). `TicketIssuedV1` enriched with contact + `PdfUrl`.
+
+### Operational notes
+
+- New DB `ticketing_service` — run its migration.
+- QuestPDF Community licence set at startup; native deps `libfontconfig1` +
+  `libfreetype6` are in the Dockerfile.
+- Reissue = reprint: keeps the ticket number + verification code.
+
+---
+
 ## MVP-2 (roadmap M3 + genuine QR) — payment safety + Bangla-QR — 2026-09-03
 
 Commit: `feat(payment): M3 — confirm/webhook/refund safety + genuine EMVCo Bangla-QR provider`.

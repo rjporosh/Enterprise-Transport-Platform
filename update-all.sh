@@ -31,6 +31,7 @@ update_db "bus" "BusService"
 update_db "notification" "NotificationService"
 update_db "payment" "PaymentService"
 update_db "route" "RouteService"
+update_db "ticketing" "TicketingService"
 
 echo ""
 echo "========================================"

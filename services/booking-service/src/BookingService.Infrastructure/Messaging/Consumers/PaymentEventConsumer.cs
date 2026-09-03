@@ -110,7 +110,8 @@ public sealed class PaymentEventConsumer : RabbitMqEventConsumer
             DepartureUtc: trip.DepartureUtc,
             ArrivalUtc: trip.ArrivalUtc,
             BusPlateNumber: bus?.PlateNumber ?? "N/A",
-            BusType: bus?.BusType ?? "Coach");
+            BusType: bus?.BusType ?? "Coach",
+            OperatorId: bus?.OperatorId ?? Guid.Empty);
     }
 
     private static string? GetString(JsonElement root, string name) =>

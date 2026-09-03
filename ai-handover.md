@@ -1,3 +1,81 @@
+# AI Handover — 2026-09-03 · MVP-3 (roadmap M6) — Ticketing Service: real ticket + QR + PDF (READ THIS FIRST)
+
+## What this pass delivered
+
+A brand-new **`services/ticketing-service`** (4 projects + unit tests + `.sln` +
+Dockerfile, same conventions as the other services). It closes the "no ticket
+anywhere" gap (P1-6).
+
+| Area | Done |
+|------|------|
+| **Ticket issuance** | `BookingConfirmedConsumer` (RabbitMQ, inbox-deduplicated) consumes `booking.confirmed` → `IssueTicketCommand` (idempotent on `BookingId`) → `Ticket.Issue()` → checksummed number `TKT-YYMMDD-XXXXXX-C` (`TicketNumber.IsValid` catches mistypes) + opaque URL-safe `VerificationCode` → renders the PDF → emits `ticket.issued` on `ticket.events`. |
+| **PDF** | `QuestPdfTicketRenderer` — A5, template-driven (brand name, colours, logo, terms), embeds a QR to `{PublicBaseUrl}/api/v1/tickets/verify/{code}`. QuestPDF Community licence set in `Program.cs`. PDF cached on the ticket row (`bytea`), regenerated on reissue. |
+| **Endpoints** | `GET /api/v1/tickets/mine` · `GET /tickets/{id}` · `GET /tickets/{id}/pdf` (owner or Admin/Operator; `application/pdf`) · `GET /tickets/verify/{code}` (**public**) · `POST /tickets/{id}/cancel` · `POST /tickets/{id}/reissue` (same number) · `GET/POST/PUT /api/v1/ticket-templates` + `POST /ticket-templates/{id}/logo` (multipart PNG ≤ 512 KB). |
+| **Templates** | operator-scoped layout/branding data (not a cloned image). Platform default (`OperatorId = Guid.Empty`) auto-created on first use. |
+| **Infra** | DB-provider factory (Postgres default), outbox + inbox, Quartz-free (no jobs yet), health checks, OpenTelemetry, Serilog, Scalar. `InitialCreate` migration (schema `ticketing`). Added to `docker-compose.yml` (`postgres-ticketing` :5438, `ticketing-service` :5205); gateway `ticketing` cluster env wired; gateway already routed `/api/v1/tickets/**`. |
+| **Contracts / booking** | `booking.confirmed` (+ `BookingConfirmedV1`) gains `OperatorId` (threaded from the `Bus` replica via `TripJourneyInfo`). `TicketIssuedV1` enriched with contact + `PdfUrl` for notification-service. |
+| Docs | `docs/programmers-guide/ticketing.md`. |
+
+## Verified end-to-end (real Postgres + RabbitMQ, all 4 services via `dotnet run`)
+
+customer books seat 1C → `POST /payments {Qr}` → `/qr` → admin `/settle-qr` →
+`payment.succeeded` → booking **Confirmed** → `booking.confirmed` → ticketing
+issues **`TKT-260903-5D94PH-3`** → `GET /tickets/mine` shows it → `GET
+/tickets/{id}/pdf` = **45 KB `%PDF-1.4`** (1 page, QR embedded) → `GET
+/tickets/verify/{code}` returns the journey + `isValid:true` → a different
+customer's token → **404** on the PDF → `ticket.issued` published + processed.
+
+## Build / test status
+
+- ticketing / booking / payment / shared: **0 errors, 0 new warnings**
+  (booking's 4 `SSH.NET` NU1903 in IntegrationTests pre-existing).
+- Unit tests: ticketing **7/7** (number checksum, state machine, reissue, PDF
+  renders `%PDF`), booking 22, payment 37, contracts 226 — all green.
+
+## What's NOT done (next agent)
+
+1. **MVP-4 = notification production-safe** (roadmap M7): seed core templates
+   (en + bn) via migration `HasData`/seeder; **consume `ticket.issued`** → email
+   with the PDF (add `Attachments` to `EmailMessage` + `SmtpEmailSender`) + SMS;
+   `.RequireAuthorization()` on send / history / cancel / preferences (P0-8);
+   one Bangladesh SMS provider behind `ISmsSender`; bump notification EF Core 9→10.
+   Notification already has en/bn `.resx` + a `NotificationEventConsumer` with a
+   routing-key→template map — add `ticket.issued` → `ticket.issued` template there.
+2. Ticketing follow-ups: `StuckTicketRenderRetryJob` (Quartz); IntegrationTests
+   for the consumer; asset store for large logos (currently base64 on the row).
+3. MVP-5/6 frontends, MVP-7 seed-data.sql + guides + observability-lite.
+4. Payment M3 leftovers (webhook dedup table, register `ResilientPaymentProvider`),
+   M4/M5 (bKash/Nagad real).
+
+## Exact commands for the next agent
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+git log --oneline -5 && git status
+
+dotnet build services/ticketing-service/TicketingService.sln services/notification-service/NotificationService.sln
+dotnet test services/ticketing-service/tests/TicketingService.UnitTests services/notification-service/tests/NotificationService.UnitTests
+
+# infra (throwaway — compose collides with other local stacks on 5432/5672/6379)
+docker start bt-verify-pg bt-verify-rmq bt-verify-redis
+# DBs already on :5542: booking_service, auth_service, payment_service, ticketing_service
+docker exec bt-verify-pg psql -U postgres -c "CREATE DATABASE notification_service;"
+dotnet ef database update --project services/notification-service/src/NotificationService.Infrastructure \
+  --startup-project services/notification-service/src/NotificationService.Api \
+  --connection "Host=localhost;Port=5542;Database=notification_service;Username=postgres;Password=postgres"
+# run scripts in scratchpad: run-auth.sh, run-payment.sh (+ analogous for booking :5601, ticketing :5205)
+# MailHog for email verification: docker run -d --name bt-mail -p 8025:8025 -p 1025:1025 mailhog/mailhog
+
+sed -n '/## M7 — Notification production-safe/,/## M8/p' docs/PRODUCTION-MILESTONES.md
+cat services/notification-service/src/NotificationService.Infrastructure/Messaging/NotificationEventConsumer.cs
+grep -n "TicketIssued" shared/contracts/Events/IntegrationEvents.cs
+```
+
+Then implement MVP-4, verify `ticket.issued → email in MailHog with the PDF`,
+docs, single commit `feat(notification): M7 — …`, continue. Never touch `.git` history.
+
+---
+
 # AI Handover — 2026-09-03 · MVP-2 (roadmap M3 + genuine QR) — payment safe + Bangla-QR (READ THIS FIRST)
 
 ## What this pass delivered

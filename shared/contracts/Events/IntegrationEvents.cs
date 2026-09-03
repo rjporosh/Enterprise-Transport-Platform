@@ -59,6 +59,7 @@ public sealed record BookingConfirmedV1 : IntegrationEventBase, IIntegrationEven
     public required Guid TripId { get; init; }
     public required Guid CustomerId { get; init; }
     public required Guid PaymentId { get; init; }
+    public required Guid OperatorId { get; init; }
 
     // Journey + customer snapshot so ticketing can issue and notification can
     // deliver a ticket without calling back into booking / route / bus / auth.
@@ -125,9 +126,7 @@ public sealed record PaymentFailedV1 : IntegrationEventBase, IIntegrationEventCo
 }
 
 // ---------------------------------------------------------------------------
-// ticket.events — reserved for the Ticketing Service (M6). Defined now so the
-// booking/payment/notification event flow can be designed against a stable
-// contract; NOT yet published by any service.
+// ticket.events — published by the Ticketing Service (M6, shipped 2026-09-03).
 // ---------------------------------------------------------------------------
 
 /// <summary><see cref="Platform.Contracts.Messaging.EventTypes.TicketIssued"/></summary>
@@ -142,4 +141,13 @@ public sealed record TicketIssuedV1 : IntegrationEventBase, IIntegrationEventCon
     public required Guid TripId { get; init; }
     public required Guid CustomerId { get; init; }
     public required string VerificationCode { get; init; }
+
+    // Contact + PDF link so notification-service can deliver the ticket without a callback.
+    public required string CustomerEmail { get; init; }
+    public required string CustomerName { get; init; }
+    public string? CustomerPhone { get; init; }
+    public required string OriginCity { get; init; }
+    public required string DestinationCity { get; init; }
+    public required DateTimeOffset DepartureUtc { get; init; }
+    public required string PdfUrl { get; init; }
 }

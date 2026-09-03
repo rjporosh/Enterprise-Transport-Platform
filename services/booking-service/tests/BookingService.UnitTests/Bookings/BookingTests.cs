@@ -18,7 +18,7 @@ public class BookingTests
     };
 
     private static readonly TripJourneyInfo Journey = new(
-        "Dhaka", "Chattogram", Now.AddHours(2), Now.AddHours(8), "DHK-METRO-11-2345", "AC Sleeper");
+        "Dhaka", "Chattogram", Now.AddHours(2), Now.AddHours(8), "DHK-METRO-11-2345", "AC Sleeper", Guid.NewGuid());
 
     private static Booking Create(
         (string, string, int, string)[]? passengers = null,
