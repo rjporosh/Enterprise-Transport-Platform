@@ -1,4 +1,78 @@
-# AI Handover — 2026-09-03 · MVP-1 (roadmap M2 + M1 slice) — booking works end-to-end (READ THIS FIRST)
+# AI Handover — 2026-09-03 · MVP-2 (roadmap M3 + genuine QR) — payment safe + Bangla-QR (READ THIS FIRST)
+
+## What this pass delivered
+
+| Area | Done |
+|------|------|
+| **Genuine QR / Bangla-QR** | `PaymentMethodType.Qr` + `QrPaymentProvider`. `EmvcoQr.Build` emits a **spec-correct EMVCo Merchant-Presented Mode** payload (TLV, MCC 4131, currency 050/BDT, CRC-16/CCITT-FALSE, payment id as bill number) — `EmvcoQr.IsValid`/`Parse` verify it; QRCoder renders the PNG (pure-managed, no native dep). `POST /api/v1/payments/{id}/qr` → `{ qrPayload, qrImageDataUri, expiresAtUtc }`. |
+| **QR settlement** | signed `POST /api/v1/webhooks/qr` (HMAC-SHA256, `Payments:Qr:WebhookSigningKey`) **or** audited admin `POST /api/v1/payments/{id}/settle-qr`. Either drives the payment to Succeeded through the provider and publishes `payment.succeeded` → booking-service confirms. |
+| **Confirm safety (P0-5)** | `ConfirmPaymentHandler` never trusts the request body — the client tx id is a hint; the payment succeeds only if a server-side `provider.GetStatusAsync` returns Succeeded. Adds owner/tenant checks from claims. QR can't be confirmed this way (no poll API) → 409, use settle. |
+| **Webhook forgery (P0-6)** | `DefaultPaymentProvider.VerifyWebhookSignature` → **false** (was `true`); `ConfirmAsync` → Unknown; `VerifyPaymentMethodAsync` → Failed. Unknown provider / bad signature / unparseable webhook → **400**, not a 200 with `success:false`. |
+| **Refunds actually refund (P0-7)** | `RefundPaymentHandler` now calls `provider.RefundAsync`, marks the `PaymentRefund` Succeeded/Failed/Processing from the result, and `Payment.ApplyRefundSettlement` moves the payment to PartiallyRefunded/Refunded **only on a settled refund** + raises `PaymentRefundedDomainEvent`. A rejected refund leaves the payment untouched. New `Payment.SettledRefundedAmount`. |
+| **CreatePayment** | tenant + customer id come from the token, not the body (P0-10/11), unless the caller is Admin/Operator. |
+| Docs | `docs/programmers-guide/payments-qr.md`; `Payments:Qr` config block in `appsettings.json`. |
+
+## Verified end-to-end (real Postgres + RabbitMQ, all 3 services via `dotnet run`)
+
+customer books seat 1A → `POST /payments {method: Qr}` → `POST /payments/{id}/qr` returns a
+CRC-valid EMVCo payload embedding the payment id → forged `POST /payments/{id}/confirm` →
+**400** → admin `POST /payments/{id}/settle-qr` → payment Succeeded → `payment.succeeded`
+published → **booking Confirmed, seat 1A Booked, `booking.confirmed` emitted**. Forged
+webhook to an unknown provider → 400. QR webhook with no signing key → 400.
+
+## Build / test status
+
+- payment / shared solutions: **0 errors, 0 new warnings**.
+- Unit tests: payment **37/37** (was 32 — +5: 3 refund-flow, 3 EMVCo QR, minus 1 net from
+  reworking 2 domain refund tests), booking 22, contracts 226 — all green.
+
+## What's NOT done (next agent)
+
+1. **MVP-3 = new `services/ticketing-service`** (roadmap M6) — the money-shot for the demo:
+   consumes `booking.confirmed` → issues a `Ticket` (number + verification code) → renders a
+   **QuestPDF** ticket with a QR to `/api/v1/tickets/verify/{code}` → emits `ticket.issued`.
+   Ticket templates + operator logo upload. Gateway already reserves the `ticketing`
+   cluster + `/api/v1/tickets/**` (→ 502 today). Add `postgres-ticketing` + `ticketing-service`
+   to compose. Contracts already have `TicketIssuedV1` (add customer email/phone + PDF URL).
+2. **MVP-4 notification** (M7): seed en/bn templates, consume `ticket.issued` → email (PDF
+   attachment) + SMS, `.RequireAuthorization()` on send/history, BD SMS provider.
+3. Payment M3 leftovers: webhook-event dedup table, register the dead `ResilientPaymentProvider`
+   in DI; M4/M5 (bKash payloads + real callback, Nagad DFS envelope).
+4. MVP-5/6 frontends, MVP-7 seed-data.sql + guides + observability-lite.
+
+## Exact commands for the next agent
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+git log --oneline -4 && git status
+
+# build + test
+dotnet build services/payment-service/PaymentService.sln services/booking-service/BookingService.sln shared/Platform.Shared.sln
+dotnet test services/payment-service/tests/PaymentService.UnitTests services/booking-service/tests/BookingService.UnitTests
+
+# infra for verification (throwaway — compose collides with other local stacks on 5432/5672/6379)
+docker start bt-verify-pg bt-verify-rmq bt-verify-redis 2>/dev/null || {
+  docker run -d --name bt-verify-pg  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=booking_service -p 5542:5432 postgres:16-alpine
+  docker run -d --name bt-verify-rmq -p 5572:5672 -p 15572:15672 rabbitmq:3.13-management-alpine
+  docker run -d --name bt-verify-redis -p 6579:6379 redis:7.4-alpine
+}
+# DBs: booking_service, auth_service, payment_service already migrated on port 5542.
+# run scripts: scratchpad has run-auth.sh / run-payment.sh; booking runs on :5601, auth :5701, payment :5202.
+
+# read the M6 plan + the reserved gateway slot BEFORE scaffolding
+sed -n '/## M6 — Ticketing Service/,/## M7/p' docs/PRODUCTION-MILESTONES.md
+sed -n '/"ticketing"/,/}/p' infrastructure/gateway/src/Platform.Gateway/appsettings.json
+grep -n "TicketIssuedV1" shared/contracts/Events/IntegrationEvents.cs
+ls services/notification-service/src   # copy this service's shape for the new ticketing-service
+```
+
+Then scaffold `services/ticketing-service` (same conventions), wire it, verify
+`booking.confirmed → ticket + PDF`, docs, single commit `feat(ticketing): M6 — …`, continue.
+Never touch `.git` history.
+
+---
+
+# AI Handover — 2026-09-03 · MVP-1 (roadmap M2 + M1 slice) — booking works end-to-end
 
 ## What this pass delivered
 

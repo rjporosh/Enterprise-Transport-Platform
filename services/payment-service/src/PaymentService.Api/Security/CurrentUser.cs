@@ -26,7 +26,17 @@ public class CurrentUser : PaymentService.Application.Common.Interfaces.ICurrent
         }
     }
 
-    public string? TenantId => _httpContextAccessor.HttpContext?.Items["TenantId"]?.ToString();
+    public Guid? CustomerId
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("customer_id");
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : UserId;
+        }
+    }
+
+    public string? TenantId => _httpContextAccessor.HttpContext?.Items["TenantId"]?.ToString()
+        ?? _httpContextAccessor.HttpContext?.User?.FindFirst("tenant_id")?.Value;
 
     public Guid? CompanyId
     {

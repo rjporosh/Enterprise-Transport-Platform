@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.Configure<BkashOptions>(configuration.GetSection("Bkash"));
         services.Configure<NagadOptions>(configuration.GetSection("Nagad"));
         services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
+        services.Configure<Providers.QrCodeOptions>(configuration.GetSection(Providers.QrCodeOptions.SectionName));
 
         services.AddHttpClient("Bkash", (sp, client) =>
         {
@@ -68,6 +69,7 @@ public static class DependencyInjection
         services.AddSingleton<BkashPaymentProvider>();
         services.AddSingleton<NagadPaymentProvider>();
         services.AddSingleton<StripePaymentProvider>();
+        services.AddSingleton<QrPaymentProvider>();
 
         services.AddHostedService<OutboxProcessor>();
 

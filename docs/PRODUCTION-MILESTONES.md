@@ -390,9 +390,10 @@ no secret literal in the repo; all 6 images non-root with a healthcheck.
 | M1 Auth hardening | 🟡 Partial (2026-09-03) — `tenant_id` + `customer_id` + `phone_number` claims in the access token; claims-based `ICurrentUser` in booking-service. Remaining: `perms` claim, SPA refresh interceptor, OTP UI, production first-admin script. | feat(booking): M2 slice + auth claims |
 | M2 Booking correctness | 🟡 Substantially done (2026-09-03) — `InitialCreate` migration; per-seat `xmin` concurrency; `PaymentEventConsumer` (payment.succeeded→confirm, payment.failed→release) + inbox dedup; `ExpiredHoldSweepJob` (Quartz); `GET /bookings/mine` + admin `GET /bookings`; ownership 404 on `GET /bookings/{id}` + cancel; `CustomerId`/contact from token not body; admin trip CRUD (`POST/GET /trips`, `GET /trips/{id}` seat map); DB-provider factory + file query/runtime logs. Remaining: booking IntegrationTests for the consumer + job; NBomber concurrency proof. | feat(booking): M2 — migrations, read-model, trip mgmt, payment-driven confirm |
 
-| M3 Payment safety | Not started | |
-| M4 Real bKash | Not started | |
-| M5 Real Nagad | Not started | |
+| M3 Payment safety | 🟡 Substantially done (2026-09-03) — `ConfirmPayment` no longer trusts the request body (verifies via `provider.GetStatusAsync`, adds owner/tenant checks); `DefaultPaymentProvider` fails closed (webhook sig → false, confirm → Unknown, verify → Failed); unknown-provider / bad-sig webhook → 400; `RefundPaymentHandler` now calls `provider.RefundAsync` and drives payment/refund state from the result (P0-7); `Payment.Status` follows **settled** refunds only. Remaining: webhook-event dedup table, register `ResilientPaymentProvider` in DI, `CreatePayment` was hardened (tenant/customer from claims). | feat(payment): M3 + genuine EMVCo Bangla-QR |
+| M4 Real bKash | Not started (bKash provider is HTTP-real but credential-gated; payload fields + real callback verification still to do) | |
+| M5 Real Nagad | Not started (Nagad needs the real DFS RSA/AES envelope rewrite) | |
+| — Genuine QR / Bangla QR | ✅ Done (2026-09-03) — `PaymentMethodType.Qr` + `QrPaymentProvider` (spec-correct EMVCo MPM payload, CRC-16, QRCoder PNG), `POST /payments/{id}/qr`, signed `POST /webhooks/qr` + audited admin `settle-qr`. Verified: customer→QR→settle→`payment.succeeded`→booking Confirmed. | feat(payment): M3 + genuine EMVCo Bangla-QR |
 | M6 Ticketing Service | Not started | |
 | M7 Notification production-safe | Not started | |
 | M8 Observability backend | Not started | |

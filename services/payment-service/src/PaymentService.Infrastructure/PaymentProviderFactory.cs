@@ -22,7 +22,8 @@ public class PaymentProviderFactory : IPaymentProviderFactory
             ["Default"] = typeof(DefaultPaymentProvider),
             ["Bkash"] = typeof(BkashPaymentProvider),
             ["Nagad"] = typeof(NagadPaymentProvider),
-            ["Stripe"] = typeof(StripePaymentProvider)
+            ["Stripe"] = typeof(StripePaymentProvider),
+            ["Qr"] = typeof(QrPaymentProvider)
         };
     }
 

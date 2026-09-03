@@ -7,8 +7,10 @@ using PaymentService.Application.Features.Payments.CancelPayment;
 using PaymentService.Application.Features.Payments.ConfirmPayment;
 using PaymentService.Application.Features.Payments.CreatePayment;
 using PaymentService.Application.Features.Payments.FailPayment;
+using PaymentService.Application.Features.Payments.GenerateQr;
 using PaymentService.Application.Features.Payments.GetPaymentById;
 using PaymentService.Application.Features.Payments.GetPayments;
+using PaymentService.Application.Features.Payments.SettleQr;
 using PaymentService.Application.Features.Payments.ProcessPayment;
 using PaymentService.Application.Features.Payments.ProcessWebhook;
 using PaymentService.Application.Features.Payments.RefundPayment;
@@ -27,10 +29,25 @@ public static class PaymentEndpoints
 
         group.MapPost("/", async (
             CreatePaymentCommand command,
+            PaymentService.Application.Common.Interfaces.ICurrentUser currentUser,
             ISender sender,
             CancellationToken ct) =>
         {
-            var result = await sender.Send(command, ct);
+            // Tenant + customer identity always come from the validated token,
+            // never the request body (P0-10 / P0-11). A privileged caller
+            // (Admin/Operator raising a payment on someone's behalf) may keep
+            // the body values.
+            var privileged = currentUser.IsInRole("Admin") || currentUser.IsInRole("Operator");
+            var tenantId = Guid.TryParse(currentUser.TenantId, out var t) ? t : command.TenantId;
+            var customerId = currentUser.CustomerId ?? command.CustomerId;
+
+            var effective = command with
+            {
+                TenantId = privileged ? command.TenantId : tenantId,
+                CustomerId = privileged ? command.CustomerId : customerId
+            };
+
+            var result = await sender.Send(effective, ct);
             return Results.Created($"/api/v1/payments/{result.PaymentId}", result);
         })
         .WithName("CreatePayment")
@@ -91,6 +108,46 @@ public static class PaymentEndpoints
         .WithName("ConfirmPayment")
         .Produces<ConfirmPaymentResponse>(StatusCodes.Status200OK)
         .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+        .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
+        group.MapPost("/{paymentId:guid}/qr", async (
+            Guid paymentId,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GenerateQrCommand(paymentId, ct), ct);
+            return Results.Ok(result);
+        })
+        .WithName("GenerateQr")
+        .WithSummary("Generate a genuine EMVCo / Bangla-QR for a QR payment.")
+        .WithDescription("Moves the payment to Processing and returns a spec-correct EMVCo merchant-presented " +
+                         "QR payload + PNG data URI. The customer scans it with any bank / MFS app. Settlement " +
+                         "arrives via POST /api/v1/webhooks/qr (signed) or the audited admin settle-qr endpoint.")
+        .Produces<GenerateQrResponse>(StatusCodes.Status200OK)
+        .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+        .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
+        group.MapPost("/{paymentId:guid}/settle-qr", async (
+            Guid paymentId,
+            SettleQrRequest body,
+            PaymentService.Application.Common.Interfaces.ICurrentUser currentUser,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var command = new SettleQrCommand(
+                paymentId,
+                string.IsNullOrWhiteSpace(body?.SettlementReference) ? $"MANUAL-{paymentId:N}" : body!.SettlementReference,
+                currentUser.UserId?.ToString() ?? "operator",
+                ct);
+            var result = await sender.Send(command, ct);
+            return Results.Ok(result);
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Admin", "Operator"))
+        .WithName("SettleQr")
+        .WithSummary("Record that a QR payment has settled (audited demo stand-in for a live acquirer callback).")
+        .Produces<SettleQrResponse>(StatusCodes.Status200OK)
+        .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
+        .Produces<ProblemDetails>(StatusCodes.Status403Forbidden)
         .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
 
         group.MapPost("/{paymentId:guid}/fail", async (
@@ -187,12 +244,45 @@ public static class PaymentEndpoints
             };
 
             var result = await sender.Send(updatedCommand, ct);
-            return Results.Ok(result);
+            // Unknown provider / bad signature / unparseable payload → 400, not a 200 with success:false.
+            return result.Success
+                ? Results.Ok(result)
+                : Results.BadRequest(new { success = false, message = result.Error ?? "Webhook rejected.", status = result.Status });
         })
         .WithName("ProcessWebhook")
         .Produces<ProcessWebhookResponse>(StatusCodes.Status200OK)
         .Produces<ProblemDetails>(StatusCodes.Status400BadRequest);
 
+        // QR settlement callback from an acquirer. HMAC-SHA256 over the raw body
+        // with Payments:Qr:WebhookSigningKey. Rejects everything when the key is
+        // unset (settle via the audited admin endpoint instead).
+        webhookGroup.MapPost("/qr", async (
+            HttpRequest request,
+            PaymentService.Application.Common.Interfaces.IPaymentProviderFactory providers,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            using var reader = new StreamReader(request.Body);
+            var rawBody = await reader.ReadToEndAsync(ct);
+            var signature = request.Headers["X-Qr-Signature"].FirstOrDefault();
+
+            if (!providers.GetProvider("Qr").VerifyWebhookSignature(rawBody, signature, null))
+                return Results.BadRequest(new { success = false, message = "Invalid or unconfigured QR webhook signature." });
+
+            using var doc = System.Text.Json.JsonDocument.Parse(rawBody);
+            if (!doc.RootElement.TryGetProperty("paymentId", out var pid) || !Guid.TryParse(pid.GetString(), out var paymentId))
+                return Results.BadRequest(new { success = false, message = "paymentId missing." });
+
+            var reference = doc.RootElement.TryGetProperty("settlementReference", out var r) ? r.GetString() : null;
+            var result = await sender.Send(new SettleQrCommand(paymentId, reference ?? $"QR-{paymentId:N}", "acquirer-webhook", ct), ct);
+            return Results.Ok(result);
+        })
+        .WithName("QrSettlementWebhook")
+        .Produces<SettleQrResponse>(StatusCodes.Status200OK)
+        .Produces<ProblemDetails>(StatusCodes.Status400BadRequest);
+
         return endpoints;
     }
 }
+
+public sealed record SettleQrRequest(string? SettlementReference);

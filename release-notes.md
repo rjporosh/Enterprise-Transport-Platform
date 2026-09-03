@@ -5,6 +5,49 @@ Platform-wide release notes. Frontend apps also keep their own
 
 ---
 
+## MVP-2 (roadmap M3 + genuine QR) — payment safety + Bangla-QR — 2026-09-03
+
+Commit: `feat(payment): M3 — confirm/webhook/refund safety + genuine EMVCo Bangla-QR provider`.
+
+### Added
+
+- **Genuine EMVCo / "Bangla QR" payment** — `PaymentMethodType.Qr` +
+  `QrPaymentProvider`. Spec-correct merchant-presented QR payload (TLV, MCC 4131,
+  BDT, CRC-16), rendered to a PNG. `POST /api/v1/payments/{id}/qr` returns the
+  payload + image + expiry; any bank / MFS app scans it.
+- QR settlement: signed `POST /api/v1/webhooks/qr` (HMAC-SHA256) or audited admin
+  `POST /api/v1/payments/{id}/settle-qr` → `payment.succeeded` → booking confirmed.
+- `docs/programmers-guide/payments-qr.md`; `Payments:Qr` config block.
+
+### Fixed / hardened
+
+- **`ConfirmPayment` no longer trusts the request body** (P0-5) — a payment
+  succeeds only on a server-side `provider.GetStatusAsync`. A forged `/confirm`
+  now returns 400.
+- **Webhook forgery** (P0-6) — `DefaultPaymentProvider` fails closed
+  (`VerifyWebhookSignature` → false, `ConfirmAsync` → Unknown). Unknown provider /
+  bad signature / bad payload → 400.
+- **Refunds call the PSP** (P0-7) — `RefundPaymentHandler` invokes
+  `provider.RefundAsync`; `Payment.Status` moves to PartiallyRefunded / Refunded
+  **only when a refund actually settles**, and then publishes `payment.refunded`.
+  A rejected refund leaves the payment untouched.
+- `CreatePayment` sources tenant + customer id from the token, not the body.
+
+### Changed (contracts / domain — additive)
+
+- `Payment` gains `SettledRefundedAmount` + `ApplyRefundSettlement()`;
+  `InitiateRefund` no longer flips status inline.
+- `PaymentRefundedDomainEvent` is now actually raised (was dead).
+
+### Operational notes
+
+- No new migration. `Payments:Qr:WebhookSigningKey` empty ⇒ the QR webhook rejects
+  all calls; settle via the audited admin endpoint until an acquirer is wired.
+- bKash / Nagad remain credential-gated (no fake success); Nagad still needs the
+  real DFS envelope (roadmap M5).
+
+---
+
 ## MVP-1 (roadmap M2 + M1 slice) — booking-service end-to-end — 2026-09-03
 
 Commit: `feat(booking): M2 — migrations, read-model consumers, trip mgmt, payment-driven confirm`.

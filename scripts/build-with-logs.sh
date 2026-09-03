@@ -45,7 +45,7 @@ for t in "${targets[@]}"; do
   status=$?
   [ $status -ne 0 ] && overall=$status
 
-  echo "$output" | grep -E ': (error|warning) (CS|NU|MSB)[0-9]+' | while IFS= read -r line; do
+  while IFS= read -r line; do
     file="$(echo "$line" | sed -E 's/^(.*)\(([0-9]+),([0-9]+)\): (error|warning) ([A-Z]+[0-9]+):.*/\1/')"
     ln="$(echo "$line"   | sed -E 's/^(.*)\(([0-9]+),([0-9]+)\): (error|warning) ([A-Z]+[0-9]+):.*/\2/')"
     col="$(echo "$line"  | sed -E 's/^(.*)\(([0-9]+),([0-9]+)\): (error|warning) ([A-Z]+[0-9]+):.*/\3/')"
@@ -60,7 +60,7 @@ for t in "${targets[@]}"; do
       echo "  Message  : $msg"
       echo "  Fix      : $(suggest "$code")"
     } >> "$LOG_FILE"
-  done
+  done < <(echo "$output" | grep -E ': (error|warning) (CS|NU|MSB)[0-9]+')
 done
 
 if [ $overall -eq 0 ]; then

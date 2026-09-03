@@ -1,70 +1,87 @@
 using FluentAssertions;
+using PaymentService.Application.Common.Models;
 using PaymentService.Application.Features.Payments.RefundPayment;
+using PaymentService.Domain.Common;
 using PaymentService.Domain.Entities;
 using PaymentService.Domain.Enums;
 using PaymentService.Domain.Exceptions;
-using PaymentService.Domain.Common;
 using Xunit;
 
 namespace PaymentService.UnitTests.Payments;
 
 public class RefundPaymentHandlerTests
 {
-    [Fact]
-    public async Task Handle_ValidRefund_ReturnsRefundResponse()
+    private static readonly Microsoft.Extensions.Logging.ILogger<RefundPaymentHandler> Logger =
+        NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<RefundPaymentHandler>>();
+
+    private static async Task<Payment> SeedSucceededPaymentAsync(TestSupport.TestPaymentDbContext db)
     {
-        using var db = new TestSupport.TestPaymentDbContext();
-        var eventPublisher = new TestSupport.FakeEventPublisher();
-        var logger = NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<RefundPaymentHandler>>();
-
-        var handler = new RefundPaymentHandler(db, eventPublisher, logger);
-
         var payment = Payment.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "ORDER-001", "idem-001", PaymentMethodType.Card,
+            "ORDER-001", $"idem-{Guid.NewGuid():N}", PaymentMethodType.Card,
             new Money(100m, "USD"), null, null, null, TimeSpan.FromMinutes(30));
-
         payment.StartProcessing();
         payment.Succeed("txn-001");
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
-
-        var command = new RefundPaymentCommand(
-            payment.Id,
-            50m,
-            "Customer request",
-            "user-001");
-
-        var result = await handler.Handle(command, CancellationToken.None);
-
-        result.Should().NotBeNull();
-        result.RefundId.Should().NotBeEmpty();
-        result.RefundAmount.Should().Be(50m);
-        result.RefundStatus.Should().Be("Pending");
+        return payment;
     }
 
     [Fact]
-    public async Task Handle_RefundMoreThanAvailable_ThrowsException()
+    public async Task Handle_WhenProviderConfirmsRefund_MarksRefundSucceeded_AndPaymentPartiallyRefunded()
     {
         using var db = new TestSupport.TestPaymentDbContext();
-        var eventPublisher = new TestSupport.FakeEventPublisher();
-        var logger = NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<RefundPaymentHandler>>();
+        var provider = new TestSupport.FakePaymentProvider { RefundResult = PaymentProviderStatus.Succeeded };
+        var handler = new RefundPaymentHandler(db, provider, new TestSupport.FakeEventPublisher(), Logger);
+        var payment = await SeedSucceededPaymentAsync(db);
 
-        var handler = new RefundPaymentHandler(db, eventPublisher, logger);
+        var result = await handler.Handle(new RefundPaymentCommand(payment.Id, 50m, "Customer request", "user-001"), CancellationToken.None);
 
-        var payment = Payment.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "ORDER-001", "idem-001", PaymentMethodType.Card,
-            new Money(100m, "USD"), null, null, null, TimeSpan.FromMinutes(30));
+        result.RefundStatus.Should().Be("Succeeded");
+        result.RefundAmount.Should().Be(50m);
 
-        payment.StartProcessing();
-        payment.Succeed("txn-001");
-        db.Payments.Add(payment);
-        await db.SaveChangesAsync();
+        var reloaded = await db.Payments.FindAsync(payment.Id);
+        reloaded!.Status.Should().Be(PaymentStatus.PartiallyRefunded);
+    }
 
-        var command = new RefundPaymentCommand(payment.Id, 150m, "Too much", "user-001");
+    [Fact]
+    public async Task Handle_WhenProviderRejectsRefund_FailsRefund_AndLeavesPaymentSucceeded()
+    {
+        using var db = new TestSupport.TestPaymentDbContext();
+        var provider = new TestSupport.FakePaymentProvider { RefundResult = PaymentProviderStatus.Failed };
+        var handler = new RefundPaymentHandler(db, provider, new TestSupport.FakeEventPublisher(), Logger);
+        var payment = await SeedSucceededPaymentAsync(db);
 
-        Func<Task> act = async () => await handler.Handle(command, CancellationToken.None);
+        var result = await handler.Handle(new RefundPaymentCommand(payment.Id, 50m, "Customer request", "user-001"), CancellationToken.None);
+
+        result.RefundStatus.Should().Be("Failed");
+
+        var reloaded = await db.Payments.FindAsync(payment.Id);
+        reloaded!.Status.Should().Be(PaymentStatus.Succeeded, "a provider-rejected refund must not move the payment (P0-7)");
+    }
+
+    [Fact]
+    public async Task Handle_WhenProviderThrows_FailsRefundGracefully()
+    {
+        using var db = new TestSupport.TestPaymentDbContext();
+        var provider = new TestSupport.FakePaymentProvider { RefundThrows = true };
+        var handler = new RefundPaymentHandler(db, provider, new TestSupport.FakeEventPublisher(), Logger);
+        var payment = await SeedSucceededPaymentAsync(db);
+
+        var result = await handler.Handle(new RefundPaymentCommand(payment.Id, 50m, "x", "user-001"), CancellationToken.None);
+
+        result.RefundStatus.Should().Be("Failed");
+    }
+
+    [Fact]
+    public async Task Handle_RefundMoreThanAvailable_Throws()
+    {
+        using var db = new TestSupport.TestPaymentDbContext();
+        var handler = new RefundPaymentHandler(db, new TestSupport.FakePaymentProvider(), new TestSupport.FakeEventPublisher(), Logger);
+        var payment = await SeedSucceededPaymentAsync(db);
+
+        var act = async () => await handler.Handle(new RefundPaymentCommand(payment.Id, 150m, "Too much", "user-001"), CancellationToken.None);
+
         await act.Should().ThrowAsync<InsufficientRefundAmountException>();
     }
 }

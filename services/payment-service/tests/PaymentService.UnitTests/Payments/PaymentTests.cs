@@ -147,9 +147,18 @@ public class PaymentTests
         refund.Should().NotBeNull();
         refund.Amount.Should().Be(50m);
         refund.Status.Should().Be(RefundStatus.Pending);
-        payment.Status.Should().Be(PaymentStatus.PartiallyRefunded);
-        payment.TotalRefundedAmount.Should().Be(50m);
+        // P0-7: status does NOT move until the provider confirms the refund.
+        payment.Status.Should().Be(PaymentStatus.Succeeded);
+        payment.TotalRefundedAmount.Should().Be(50m);   // over-refund guard counts the pending row
+        payment.SettledRefundedAmount.Should().Be(0m);
         payment.AvailableRefundAmount.Should().Be(50m);
+
+        refund.MarkProcessing();
+        refund.Succeed("provider-refund-1");
+        payment.ApplyRefundSettlement(refund);
+
+        payment.Status.Should().Be(PaymentStatus.PartiallyRefunded);
+        payment.SettledRefundedAmount.Should().Be(50m);
     }
 
     [Fact]
@@ -163,7 +172,12 @@ public class PaymentTests
         payment.StartProcessing();
         payment.Succeed("txn-001");
 
-        payment.InitiateRefund(100m, "Full refund", "user-001");
+        var refund = payment.InitiateRefund(100m, "Full refund", "user-001");
+        payment.Status.Should().Be(PaymentStatus.Succeeded, "not until the provider confirms");
+
+        refund.MarkProcessing();
+        refund.Succeed("provider-refund-full");
+        payment.ApplyRefundSettlement(refund);
 
         payment.Status.Should().Be(PaymentStatus.Refunded);
         payment.AvailableRefundAmount.Should().Be(0);

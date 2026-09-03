@@ -8,5 +8,7 @@ public enum PaymentMethodType
     Cash = 3,
     Bkash = 4,
     Nagad = 5,
+    /// <summary>Merchant-presented EMVCo QR ("Bangla QR"). Customer scans with any bank / MFS app.</summary>
+    Qr = 6,
     Unknown = 99
 }

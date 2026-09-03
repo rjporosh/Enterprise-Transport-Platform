@@ -37,8 +37,16 @@ public sealed class Payment : AggregateRoot
     public DateTimeOffset? ProcessedAtUtc { get; private set; }
     public IReadOnlyCollection<PaymentRefund> Refunds => _refunds.AsReadOnly();
 
+    // Everything not yet failed — used as the over-refund guard so two pending
+    // refunds can't jointly exceed the captured amount.
     public decimal TotalRefundedAmount => _refunds
         .Where(r => r.Status != RefundStatus.Failed)
+        .Sum(r => r.Amount);
+
+    // Only refunds the provider has actually settled — this is what drives the
+    // Payment.Status transition (P0-7: status follows confirmed refunds only).
+    public decimal SettledRefundedAmount => _refunds
+        .Where(r => r.Status == RefundStatus.Succeeded)
         .Sum(r => r.Amount);
 
     public decimal AvailableRefundAmount => Amount.Amount - TotalRefundedAmount;
@@ -185,17 +193,34 @@ public sealed class Payment : AggregateRoot
 
         _refunds.Add(refund);
 
-        if (TotalRefundedAmount >= Amount.Amount)
-        {
-            Status = PaymentStatus.Refunded;
-        }
-        else if (Status == PaymentStatus.Succeeded)
-        {
-            Status = PaymentStatus.PartiallyRefunded;
-        }
-
+        // Status is NOT changed here (P0-7) — a Pending refund that the
+        // provider later rejects must not have moved the payment to Refunded.
+        // ApplyRefundSettlement() does the transition once the provider confirms.
         UpdatedAtUtc = DateTimeOffset.UtcNow;
         return refund;
+    }
+
+    /// <summary>
+    /// Called after the provider settles (or rejects) a refund. On a confirmed
+    /// refund it moves the payment to PartiallyRefunded / Refunded and raises
+    /// <see cref="PaymentRefundedDomainEvent"/> (→ <c>payment.refunded</c>). A
+    /// rejected refund leaves the payment status untouched.
+    /// </summary>
+    public void ApplyRefundSettlement(PaymentRefund refund)
+    {
+        if (refund.Status != RefundStatus.Succeeded)
+        {
+            UpdatedAtUtc = DateTimeOffset.UtcNow;
+            return;
+        }
+
+        Status = SettledRefundedAmount >= Amount.Amount
+            ? PaymentStatus.Refunded
+            : PaymentStatus.PartiallyRefunded;
+        UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        Raise(new PaymentRefundedDomainEvent(
+            Id, refund.Id, TenantId, refund.Amount, refund.Currency, refund.ProviderRefundReference, UpdatedAtUtc.Value));
     }
 
     public void UpdateProviderReference(string? providerReference)
