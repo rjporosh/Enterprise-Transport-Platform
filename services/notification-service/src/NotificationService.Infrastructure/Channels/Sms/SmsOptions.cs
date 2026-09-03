@@ -4,9 +4,14 @@ public sealed class SmsOptions
 {
     public const string SectionName = "Sms";
 
-    /// <summary>Twilio | GenericHttp — selects the ISmsSender implementation at startup, same "switch by config" convention as Database:Provider. See SmsSenderFactory.</summary>
+    /// <summary>Twilio | GenericHttp | Bd — selects the ISmsSender implementation at startup, same "switch by config" convention as Database:Provider. See SmsSenderFactory.</summary>
     public string Provider { get; set; } = "GenericHttp";
     public string FromNumber { get; set; } = string.Empty;
+
+    // Bd — a Bangladeshi bulk-SMS aggregator on the common form-encoded HTTP
+    // contract (api_token / sid / msisdn / sms), e.g. SSLWireless, bulksmsbd,
+    // Mimsms, Alpha-net. Configure Sms:Bd:* and select Sms:Provider=Bd.
+    public BdSmsOptions Bd { get; set; } = new();
 
     // Twilio
     public string TwilioAccountSid { get; set; } = string.Empty;

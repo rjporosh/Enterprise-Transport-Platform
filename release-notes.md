@@ -5,6 +5,55 @@ Platform-wide release notes. Frontend apps also keep their own
 
 ---
 
+## MVP-4 (roadmap M7) — Notification Service: Production-Safe — 2026-09-03
+
+Commit: `feat(notification): M7 — production-safe delivery, EF Core 10, BD SMS, ticket.issued consumer, inbox dedup, authz`.
+
+### Added
+
+- **Core template seeder** — 18 templates seeded on startup (9 events × en + bn):
+  `auth.welcome`, `auth.password-changed`, `auth.account-locked`, `booking.held`,
+  `booking.confirmed`, `booking.cancelled`, `payment.receipt`, `payment.failed`,
+  **`ticket.issued`** (includes PDF download link via `{{pdfUrl}}`).
+- **Bangladesh SMS provider** — `BdSmsSender` supports SSLWireless / bulksmsbd /
+  Mimsms / Alpha-net aggregators via configurable form-encoded HTTP fields
+  (`Sms:Provider=Bd`, `Sms:Bd:Endpoint/ApiToken/SenderId/…`).
+- **`ticket.issued` event consumption** — `NotificationEventConsumer` now maps
+  `ticket.events / ticket.issued` → `ticket.issued` email template; template body
+  contains a PDF download link so recipients can print their ticket.
+- **Inbox dedup** — consumer extracts `EventId: Guid` from payload and sets
+  `SourceReference = "{routingKey}:{eventId}"`; `SendNotificationHandler` checks
+  `AnyAsync` before creating — RabbitMQ at-least-once redelivery produces exactly
+  one notification row. Unique filtered DB index as belt-and-suspenders.
+- **Claim-then-send dispatch** — `NotificationDispatchJob` persists `Sending` status
+  *before* calling the SMTP/SMS/FCM provider; result persisted per-notification
+  after the send. A process crash between send and save leaves the row in `Sending`
+  (not `Pending`), preventing `StuckNotificationRecoveryJob` from re-dispatching
+  and re-delivering the same message.
+- **Authorization** — `.RequireAuthorization()` on the entire
+  `/api/v1/notifications` group; unauthenticated requests → 401.
+- EF migrations: `FixTemplateRowVersionConcurrency`, `AddUniqueSourceReferenceIndex`.
+
+### Changed
+
+- EF Core 9.0.0 → **10.0.0** across all notification `.csproj` files.
+- Quartz 3.13.1 → **3.14.0**.
+- Pomelo stays 9.0.0 (Pomelo EF Core 10 not yet released); NU1608 suppressed via
+  `<NoWarn>` in PropertyGroups — **0 build warnings** solution-wide.
+
+### Tests
+
+- Unit: **29/29** (was 27 — 2 new dedup tests added).
+- 0 errors, 0 warnings.
+
+### Operational notes
+
+- `notification_service` DB: run the two new migrations.
+- `Sms:Provider=Bd` requires aggregator credentials; defaults to `GenericHttp`.
+- Templates are seeded idempotently on startup — operator edits are never overwritten.
+
+---
+
 ## MVP-3 (roadmap M6) — Ticketing Service: real ticket + QR + PDF — 2026-09-03
 
 Commit: `feat(ticketing): M6 — new service: ticket issuance, QR, QuestPDF, templates`.

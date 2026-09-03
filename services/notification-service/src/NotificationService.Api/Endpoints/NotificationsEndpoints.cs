@@ -13,13 +13,18 @@ public static class NotificationsEndpoints
 {
     public static void MapNotificationsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/notifications").WithTags("Notifications");
+        // Every REST notification endpoint requires a token (P0-8): payloads
+        // carry recipient PII and message bodies. The event-driven send path
+        // (NotificationEventConsumer → MediatR) does not go through HTTP and is
+        // unaffected.
+        var group = app.MapGroup("/api/v1/notifications").WithTags("Notifications").RequireAuthorization();
 
         group.MapPost("/", SendAsync)
             .WithName("SendNotification")
-            .WithSummary("Send or schedule a notification on one channel (Email/SMS/Push).")
+            .WithSummary("Send or schedule a notification on one channel (Email/SMS/Push). Requires auth.")
             .Produces<ApiResponse<SendNotificationResultDto>>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
             .RequireRateLimiting("notification-write");
 
         group.MapGet("/{id:guid}", GetByIdAsync)

@@ -39,6 +39,21 @@ public sealed class SendNotificationHandler : IRequestHandler<SendNotificationCo
 
     public async Task<Result<SendNotificationResultDto>> Handle(SendNotificationCommand request, CancellationToken cancellationToken)
     {
+        // Inbox dedup: if SourceReference is set and a notification already exists
+        // for this exact event id, return a lightweight success so the consumer can
+        // ack the message without creating a duplicate row. Covers RabbitMQ
+        // at-least-once redelivery and idempotent REST callers.
+        if (!string.IsNullOrWhiteSpace(request.SourceReference))
+        {
+            var alreadyExists = await _dbContext.Notifications
+                .AsNoTracking()
+                .AnyAsync(n => n.SourceReference == request.SourceReference, cancellationToken);
+
+            if (alreadyExists)
+                return Result<SendNotificationResultDto>.Success(
+                    new SendNotificationResultDto(Guid.Empty, request.Channel, NotificationStatus.Pending, null));
+        }
+
         var nowUtc = _dateTimeProvider.UtcNow;
         var errors = new List<Error>();
 

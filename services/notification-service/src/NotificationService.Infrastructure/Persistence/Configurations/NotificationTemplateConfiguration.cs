@@ -19,7 +19,17 @@ public sealed class NotificationTemplateConfiguration : IEntityTypeConfiguration
         builder.Property(t => t.Subject).HasMaxLength(500);
         builder.Property(t => t.Body).IsRequired();
 
-        builder.Property(t => t.RowVersion).IsRowVersion();
+        // Optimistic concurrency for concurrent template edits. Mapped as a
+        // plain application-managed concurrency token (NOT .IsRowVersion()):
+        // on Npgsql, .IsRowVersion() on a byte[] marks the column
+        // store-generated, so EF omits it from INSERT and Postgres rejects the
+        // NOT NULL bytea — which broke ALL template creation + seeding on
+        // Postgres. As a concurrency token EF sends the initial empty value on
+        // insert and includes it in the UPDATE WHERE clause.
+        builder.Property(t => t.RowVersion)
+            .IsConcurrencyToken()
+            .HasColumnType("bytea")
+            .HasDefaultValueSql("''::bytea");
 
         // A given (Key, Channel, Locale) triple identifies exactly one
         // active template -- soft-deleted rows are excluded via a filtered

@@ -201,15 +201,15 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
     try
     {
         await db.Database.MigrateAsync();
+        await NotificationService.Infrastructure.Persistence.CoreTemplateSeeder.SeedAsync(db, startupLogger);
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("Startup");
-        logger.LogError(ex, "Database migration failed on startup. The application will continue without applied migrations.");
+        startupLogger.LogError(ex, "Database migration/seed failed on startup. The application will continue without applied migrations.");
     }
 }
 

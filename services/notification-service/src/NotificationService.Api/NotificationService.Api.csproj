@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <RootNamespace>NotificationService.Api</RootNamespace>
     <UserSecretsId>notification-service-7c2e9f41</UserSecretsId>
+    <!-- Suppress transitive Pomelo NU1608 (EF Core 10 / Pomelo 9 constraint mismatch) — same as Infrastructure and AuthService.Api. -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +18,7 @@
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
 
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

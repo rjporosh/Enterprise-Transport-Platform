@@ -32,7 +32,7 @@ public sealed class NotificationTemplate : AggregateRoot
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
     /// <summary>EF Core row-version concurrency token — distinct from AggregateRoot.Version (business/schema version above), guards against two admins editing the same template simultaneously.</summary>
-    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
+    public byte[] RowVersion { get; private set; } = Guid.NewGuid().ToByteArray();
 
     private NotificationTemplate() { } // EF Core
 
@@ -73,6 +73,7 @@ public sealed class NotificationTemplate : AggregateRoot
         Body = body;
         DataPayloadTemplate = dataPayloadTemplate;
         Version++;
+        RowVersion = Guid.NewGuid().ToByteArray();
         UpdatedAtUtc = nowUtc;
     }
 

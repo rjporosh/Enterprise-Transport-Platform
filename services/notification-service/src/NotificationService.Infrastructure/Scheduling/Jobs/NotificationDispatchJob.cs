@@ -67,14 +67,25 @@ public sealed class NotificationDispatchJob : IJob
 
         foreach (var notification in due)
         {
+            // Claim-then-send: persist Sending status BEFORE the channel call so
+            // that a process crash between the send and the result save leaves the
+            // row in Sending (not Pending). StuckNotificationRecoveryJob resets
+            // Sending rows after its stuck threshold — preventing a duplicate send
+            // on the next dispatch cycle. Without this first save, a crash after
+            // SMTP/SMS delivery but before SaveChanges would re-dispatch and
+            // re-deliver the same notification.
+            notification.MarkSending(dateTimeProvider.UtcNow);
+            await dbContext.SaveChangesAsync(context.CancellationToken);
+
             await DispatchOneAsync(notification, dateTimeProvider, emailSender, smsSender, pushSender, context.CancellationToken);
 
             foreach (var domainEvent in notification.DomainEvents)
                 await eventPublisher.EnqueueAsync(domainEvent, context.CancellationToken);
             notification.ClearDomainEvents();
-        }
 
-        await dbContext.SaveChangesAsync(context.CancellationToken);
+            // Persist Sent/Failed status + outbox events atomically per notification.
+            await dbContext.SaveChangesAsync(context.CancellationToken);
+        }
     }
 
     private async Task DispatchOneAsync(
@@ -85,8 +96,8 @@ public sealed class NotificationDispatchJob : IJob
         IPushSender pushSender,
         CancellationToken cancellationToken)
     {
-        notification.MarkSending(dateTimeProvider.UtcNow);
-
+        // MarkSending is called by the caller loop before the first SaveChanges
+        // (claim step) so we arrive here already in Sending status.
         var result = notification.Channel switch
         {
             NotificationChannel.Email => await emailSender.SendAsync(

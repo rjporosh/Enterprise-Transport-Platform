@@ -45,6 +45,7 @@ public sealed class NotificationEventConsumer : BackgroundService
             [EventTypes.BookingCancelled] = ("booking.cancelled", NotificationChannel.Email),
             [EventTypes.PaymentSucceeded] = ("payment.receipt", NotificationChannel.Email),
             [EventTypes.PaymentFailed] = ("payment.failed", NotificationChannel.Email),
+            [EventTypes.TicketIssued] = ("ticket.issued", NotificationChannel.Email),
         };
 
     private readonly RabbitMqOptions _options;
@@ -160,6 +161,15 @@ public sealed class NotificationEventConsumer : BackgroundService
 
             var variables = ToVariableBag(root);
 
+            // Build a globally-unique SourceReference for inbox dedup.
+            // Every IntegrationEventBase carries EventId: Guid — use it so that
+            // RabbitMQ at-least-once redelivery of the same event produces a
+            // second SendNotificationCommand that the handler will recognise and
+            // suppress (AnyAsync check on SourceReference).
+            var sourceReference = routingKey; // fallback if EventId absent
+            if (root.TryGetProperty("EventId", out var eidProp) && eidProp.TryGetGuid(out var eventId))
+                sourceReference = $"{routingKey}:{eventId}";
+
             using var mediatorScope = _scopeFactory.CreateScope();
             var mediator = mediatorScope.ServiceProvider.GetRequiredService<IMediator>();
             var result = await mediator.Send(new SendNotificationCommand(
@@ -171,7 +181,7 @@ public sealed class NotificationEventConsumer : BackgroundService
                 Body: null,
                 DataPayload: null,
                 RecipientId: recipientId,
-                SourceReference: routingKey,
+                SourceReference: sourceReference,
                 Locale: null,
                 Priority: NotificationPriority.Normal,
                 ScheduledForUtc: null,
@@ -205,8 +215,11 @@ public sealed class NotificationEventConsumer : BackgroundService
 
         return channel switch
         {
-            NotificationChannel.Sms => TryGetString(root, "PhoneNumber") ?? TryGetString(root, "Phone"),
+            NotificationChannel.Sms => TryGetString(root, "PhoneNumber")
+                ?? TryGetString(root, "CustomerPhone")
+                ?? TryGetString(root, "Phone"),
             _ => TryGetString(root, "Email")
+                ?? TryGetString(root, "CustomerEmail")
         };
     }
 

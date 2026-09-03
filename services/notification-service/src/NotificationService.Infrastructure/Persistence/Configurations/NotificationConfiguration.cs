@@ -34,7 +34,14 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.HasIndex(n => n.Status);
         builder.HasIndex(n => new { n.Status, n.NextRetryAtUtc });
         builder.HasIndex(n => new { n.Status, n.ScheduledForUtc });
-        builder.HasIndex(n => n.SourceReference);
+        // Unique filtered index on SourceReference (inbox dedup). NULL values are
+        // excluded from the unique constraint — non-event notifications that omit
+        // SourceReference are unaffected. Postgres treats each NULL as distinct so
+        // the filter is required; the AnyAsync check in SendNotificationHandler is
+        // the fast path; this index is belt-and-suspenders for concurrent inserts.
+        builder.HasIndex(n => n.SourceReference)
+            .IsUnique()
+            .HasFilter("\"SourceReference\" IS NOT NULL");
         builder.HasIndex(n => n.CreatedAtUtc);
         builder.HasIndex(n => n.Recipient);
 

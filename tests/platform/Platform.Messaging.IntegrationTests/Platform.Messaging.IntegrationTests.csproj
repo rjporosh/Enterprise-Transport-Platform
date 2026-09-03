@@ -19,6 +19,8 @@
     <PackageReference Include="Testcontainers.RabbitMq" Version="4.0.0" />
     <!-- Same RabbitMQ client version the services publish with. -->
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+      <!-- Pin the transitive SSH.NET (via Testcontainers) past GHSA-q939-rpr3-3284 (NU1903). -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 
   <ItemGroup>

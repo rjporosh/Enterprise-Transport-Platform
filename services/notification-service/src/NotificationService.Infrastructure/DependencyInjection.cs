@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.Configure<SmsOptions>(configuration.GetSection(SmsOptions.SectionName));
         services.AddHttpClient<TwilioSmsSender>();
         services.AddHttpClient<GenericHttpSmsSender>();
+        services.AddHttpClient<BdSmsSender>();
         services.AddSingleton<ISmsSender>(sp => AddSmsSenderFactory(sp, configuration));
 
         services.Configure<PushOptions>(configuration.GetSection(PushOptions.SectionName));
@@ -71,8 +72,9 @@ public static class DependencyInjection
         {
             "twilio" => sp.GetRequiredService<TwilioSmsSender>(),
             "generichttp" => sp.GetRequiredService<GenericHttpSmsSender>(),
+            "bd" => sp.GetRequiredService<BdSmsSender>(),
             _ => throw new InvalidOperationException(
-                $"Unsupported Sms:Provider '{provider}'. Supported: Twilio, GenericHttp.")
+                $"Unsupported Sms:Provider '{provider}'. Supported: Twilio, GenericHttp, Bd.")
         };
     }
 

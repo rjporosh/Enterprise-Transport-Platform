@@ -136,5 +136,58 @@ public class SendNotificationHandlerTests : IDisposable
         result.IsSuccess.Should().BeTrue();
     }
 
+    // ---- Inbox dedup tests (M7) -------------------------------------------------
+
+    [Fact]
+    public async Task Handle_WithDuplicateSourceReference_ReturnsDedupSuccess_WithoutCreatingSecondRow()
+    {
+        // Simulate RabbitMQ at-least-once redelivery: the same event id arrives twice.
+        var sourceRef = $"ticket.issued:{Guid.NewGuid()}";
+        var command = new SendNotificationCommand(
+            Recipient: "alice@example.com",
+            Channel: NotificationChannel.Email,
+            TemplateKey: null,
+            TemplateVariables: null,
+            Subject: "Ticket ready",
+            Body: "Your ticket is ready.",
+            DataPayload: null,
+            RecipientId: null,
+            SourceReference: sourceRef,
+            Locale: null,
+            Priority: NotificationPriority.Normal,
+            ScheduledForUtc: null,
+            MaxRetryCount: null,
+            IsTransactional: true);
+
+        var handler = CreateHandler();
+
+        var first = await handler.Handle(command, CancellationToken.None);
+        var second = await handler.Handle(command, CancellationToken.None); // same SourceReference
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+        // Only one row — the second call was suppressed.
+        (await _context.Notifications.CountAsync()).Should().Be(1);
+        // The dedup hit returns a phantom dto with Guid.Empty so the consumer
+        // can distinguish a real creation from a suppressed duplicate.
+        second.Value!.NotificationId.Should().Be(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task Handle_WithNullSourceReference_AlwaysCreatesNewRow()
+    {
+        // Two notifications with no SourceReference must both be created —
+        // null means "not an event-driven send, no dedup" (REST callers
+        // may legitimately send the same body twice without a SourceReference).
+        var handler = CreateHandler();
+
+        var first = await handler.Handle(BasicCommand(), CancellationToken.None);
+        var second = await handler.Handle(BasicCommand(), CancellationToken.None);
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+        (await _context.Notifications.CountAsync()).Should().Be(2);
+    }
+
     public void Dispose() => _context.Dispose();
 }

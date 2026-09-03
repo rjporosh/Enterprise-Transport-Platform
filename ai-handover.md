@@ -1,4 +1,70 @@
-# AI Handover — 2026-09-03 · MVP-3 (roadmap M6) — Ticketing Service: real ticket + QR + PDF (READ THIS FIRST)
+# AI Handover — 2026-09-03 · MVP-4 (roadmap M7) — Notification Service: Production-Safe (READ THIS FIRST)
+
+## What this pass delivered
+
+| Area | Done |
+|------|------|
+| **EF Core 9→10 bump** | All notification `.csproj` files updated; Pomelo stays 9.0.0 with NU1608 suppressed (same pattern as auth-service); Quartz 3.13→3.14 |
+| **BD SMS provider** | `BdSmsSender` — form-encoded HTTP adapter for SSLWireless/bulksmsbd/Mimsms/Alpha-net aggregators; selected via `Sms:Provider=Bd`; all fields configurable |
+| **Core template seeder** | `CoreTemplateSeeder` seeds 18 templates (9 events × en + bn) on startup: auth.welcome, auth.password-changed, auth.account-locked, booking.held/confirmed/cancelled, payment.receipt/failed, **ticket.issued** |
+| **ticket.issued consumer** | `NotificationEventConsumer.RoutingKeyMap` maps `ticket.issued` → `("ticket.issued", Email)`; template includes `{{pdfUrl}}` download link; `ticket.events` exchange added to `UpstreamBindings` |
+| **Claim-then-send dispatch** | `NotificationDispatchJob` now calls `MarkSending` + `SaveChanges` *before* the channel send (claim), then `SaveChanges` again *after* (result). A crash between SMTP send and result-save leaves the row in `Sending` — `StuckNotificationRecoveryJob` picks it up, preventing duplicate delivery |
+| **Inbox dedup** | Consumer extracts `EventId: Guid` from payload → `SourceReference = "{routingKey}:{eventId}"`; `SendNotificationHandler` does `AnyAsync` check on SourceReference before creating — RabbitMQ redelivery of the same event produces exactly one notification row; unique filtered DB index for belt-and-suspenders |
+| **Authorization** | `.RequireAuthorization()` on entire `/api/v1/notifications` endpoint group — unauthenticated requests return 401 |
+| **RowVersion migration** | `FixTemplateRowVersionConcurrency` — corrects EF Core template concurrency token mapping |
+| **Unique SourceReference migration** | `AddUniqueSourceReferenceIndex` — `UNIQUE` filtered index on `notification.notifications.SourceReference WHERE NOT NULL` |
+| **SSH.NET security pin** | All 6 IntegrationTests `.csproj` files pin `SSH.NET 2026.0.0` past advisory GHSA-q939-rpr3-3284 |
+| **Unit tests** | 29/29 pass (was 27 — added 2 dedup tests: duplicate SourceReference suppressed, null SourceReference always creates) |
+
+## Build / test status
+
+- Notification service: **0 errors, 0 warnings** (`NoWarn NU1608` in Infrastructure + Api PropertyGroups)
+- Unit tests: **29/29** green
+
+## Verified (can be confirmed manually)
+
+```bash
+# Build
+dotnet build services/notification-service/NotificationService.sln
+# Tests
+dotnet test services/notification-service/tests/NotificationService.UnitTests
+# Authz: GET without token → 401
+curl -i http://localhost:5200/api/v1/notifications
+# Authz: GET with token → 200
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:5200/api/v1/notifications
+# Templates seeded
+curl http://localhost:5200/api/v1/templates
+```
+
+## What's NOT done (next agent)
+
+1. **M8 — Observability backend**: OTel Collector + Jaeger + Prometheus + Grafana in docker-compose; fix `prometheus.yml` scrape targets; Seq or Loki log sink; propagate `traceparent` in RabbitMQ `BasicProperties` so booking→payment→notification→ticket traces are connected in Jaeger.
+2. **Ticketing follow-ups**: `StuckTicketRenderRetryJob` (Quartz); IntegrationTests for ticket consumer; large-logo asset store.
+3. **Payment M3 leftovers**: webhook-event dedup table; register `ResilientPaymentProvider` in DI.
+4. **MVP-5/6**: Angular customer web + React admin frontends.
+5. **M9**: Redis-backed distributed rate limiting + distributed idempotency cache.
+
+## Exact commands for the next agent (M8)
+
+```bash
+cd ~/Downloads/porosh/Enterprise-Transport-Platform
+git log --oneline -5 && git status
+
+# Read M8 spec
+sed -n '/## M8 — Observability backend/,/## M9/p' docs/PRODUCTION-MILESTONES.md
+
+# Current docker-compose state
+grep -n "jaeger\|prometheus\|grafana\|seq\|otel" infrastructure/docker/docker-compose.yml
+
+# Check each service's OTLP endpoint config key
+grep -rn "OtlpEndpoint\|otlp" services/*/src/*/appsettings.json
+```
+
+Then add the OTel Collector + Jaeger + Prometheus + Grafana compose profile, align OTLP config keys, fix prometheus scrape targets, add traceparent to RabbitMQ publishers, commit `feat(observability): M8 — …`, continue.
+
+---
+
+# AI Handover — 2026-09-03 · MVP-3 (roadmap M6) — Ticketing Service: real ticket + QR + PDF
 
 ## What this pass delivered
 
